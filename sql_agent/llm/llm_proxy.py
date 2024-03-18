@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Literal, Optional
+from typing import Literal, Optional, Any
 from langchain_community.chat_models.azure_openai import AzureChatOpenAI
 
 from sql_agent.config.settings import AZURE_API_KEY, AZURE_ENDPOINT
@@ -45,7 +45,7 @@ class LLMProxy:
         )
         return llm
 
-    def get_response_from_llm(self, question: str, llm_name: str = "azure"):
+    def get_response_from_llm(self, question: Any, llm_name: str = "azure"):
         if llm_name == "azure":
             return self.azure_llm.invoke(question)
         else:
