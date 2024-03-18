@@ -1,0 +1,29 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debugger Current File",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${file}",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/sql_agent"
+      },
+      "justMyCode": false
+    },
+    {
+      "name": "template",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/xxx/yyy",
+      "console": "integratedTerminal",
+      "args": [],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/xxx/yyy"
+      }
+    }
+  ]
+}

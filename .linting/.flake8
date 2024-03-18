@@ -1,0 +1,15 @@
+[flake8]
+max-line-length=120
+exclude=recipe.py
+ignore =
+    # Ignore E701 as it does not properly handle type hints in variable declaration
+    # and can therefore raise unwanted warnings in normal code, e.g. fields in dataclasses
+    E701,
+    # Ignore F821 as flake8 cannot yet handle future __annotations
+    F821,
+    # Ignore line break before or after binary operator
+    W503,
+    W504,
+    # This is incompatible with black and the black dev team suggest E203 is not pep8 compliant
+    # https://github.com/psf/black/issues/315
+    E203,
