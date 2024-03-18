@@ -1,4 +1,5 @@
 openai
 pydantic<2.*
 langchain
-dotenv
+python-dotenv
+mysql-connector-python
