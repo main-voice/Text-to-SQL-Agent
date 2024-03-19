@@ -1,6 +1,6 @@
 import unittest
 
-from sql_agent.database.mysql_manager import MySQLManager
+from text_to_sql.database.mysql_manager import MySQLManager
 
 
 class TestMySQLManager(unittest.TestCase):

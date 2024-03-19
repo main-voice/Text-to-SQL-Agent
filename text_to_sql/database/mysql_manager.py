@@ -1,8 +1,8 @@
 import mysql.connector
 from mysql.connector import Error, MySQLConnection
 
-from sql_agent.config.settings import DB_HOST, DB_NAME, DB_PASSWORD, DB_USER
-from sql_agent.utils.logger import get_logger
+from text_to_sql.config.settings import DB_HOST, DB_NAME, DB_PASSWORD, DB_USER
+from text_to_sql.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
