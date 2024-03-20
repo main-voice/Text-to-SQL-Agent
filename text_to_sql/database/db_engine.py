@@ -23,7 +23,7 @@ class DBEngine(ABC):
     def __init__(self, config: DBConfig = None):
         self.db_config = config if config else DBConfig()
 
-    def create_connection(self, db_name=None):
+    def create_connection(self):
         raise NotImplementedError("create_connection method is not implemented")
 
     def get_connection_url(self):
@@ -43,16 +43,12 @@ class MySQLEngine(DBEngine):
 
     # actually type of db_connection is MySQLConnection, but we use Union to avoid warning
     db_connection: Union[PooledMySQLConnection | MySQLConnectionAbstract]
-    is_connected: bool = False  # Store the status of the connection
 
     def __init__(self, config: DBConfig = None):
         super().__init__(config)
 
-    def create_connection(self, db_name=None):
+    def create_connection(self):
         # By default, we use the info in the .env file as the name of the database
-        if db_name:
-            self.db_config.db_name = db_name
-
         try:
             self.db_connection = mysql.connector.connect(
                 host=self.db_config.db_host,
@@ -66,7 +62,7 @@ class MySQLEngine(DBEngine):
 
         except mysql.connector.Error as err:
             logger.error(f"Error when connecting {self.db_config.db_name}: {err}")
-            return None
+            raise err
 
     def get_connection_url(self):
         if self.db_config.db_type == "mysql":
@@ -90,6 +86,7 @@ class MySQLEngine(DBEngine):
             logger.info(f"Close connection to {self.db_config.db_name} successfully")
         except mysql.connector.Error as err:
             logger.error(f"Error when closing connection to {self.db_config.db_name}: {err}")
+            raise err
 
     def execute_query(self, query):
         """
@@ -110,7 +107,7 @@ class MySQLEngine(DBEngine):
                 raise ValueError("Only support SELECT query for now!")
         except mysql.connector.Error as err:
             logger.error(f"Error when executing query: {err}")
-            return None
+            raise err
         finally:
             # Firstly, close the cursor
             cursor.close()
