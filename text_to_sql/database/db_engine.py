@@ -96,6 +96,11 @@ class MySQLEngine(DBEngine):
         if not self.is_connected:
             self.create_connection()
 
+        if not isinstance(query, str) or not query.strip():
+            raise ValueError("Query must be a non-empty string")
+
+        query = query.strip().lower()
+
         cursor = self.db_connection.cursor()
 
         try:
@@ -104,7 +109,8 @@ class MySQLEngine(DBEngine):
                 cursor.execute(query)
                 return cursor.fetchall()
             else:
-                raise ValueError("Only support SELECT query for now!")
+                supported_query = "SELECT"
+                raise ValueError(f"Only {supported_query} queries are supported for now!")
         except mysql.connector.Error as err:
             logger.error(f"Error when executing query: {err}")
             raise err
