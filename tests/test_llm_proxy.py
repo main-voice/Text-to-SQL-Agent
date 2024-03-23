@@ -1,5 +1,5 @@
 import unittest
-from sql_agent.llm.llm_proxy import LLMProxy
+from text_to_sql.llm.llm_proxy import LLMProxy
 from langchain_core.messages import HumanMessage, SystemMessage
 
 

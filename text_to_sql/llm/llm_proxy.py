@@ -2,7 +2,7 @@ from pydantic import BaseModel
 from typing import Literal, Optional, Any
 from langchain_community.chat_models.azure_openai import AzureChatOpenAI
 
-from sql_agent.config.settings import AZURE_API_KEY, AZURE_ENDPOINT
+from text_to_sql.config.settings import AZURE_API_KEY, AZURE_ENDPOINT
 
 
 class BaseLLMConfig(BaseModel):

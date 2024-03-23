@@ -1,6 +1,6 @@
 import logging
 
-from sql_agent.config.settings import LOGGING_LEVEL
+from text_to_sql.config.settings import LOGGING_LEVEL
 
 # Unify the logging format
 LOGGING_FORMAT = "%(asctime)s [%(levelname)-7s] %(filename)20s:%(lineno)-4d %(message)s"
