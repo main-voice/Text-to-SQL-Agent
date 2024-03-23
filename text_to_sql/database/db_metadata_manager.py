@@ -14,7 +14,7 @@ from .models import ColumnMetadata, TableMetadata, DatabaseMetadata
 logger = get_logger(__name__)
 
 
-class MetadataManager:
+class DBMetadataManager:
     """
     Collect the metadata for a given database (including tables info, columns info, primary keys, foreign keys, indexes)
     """
@@ -72,12 +72,3 @@ class MetadataManager:
         Get metadata for a given column name
         """
         return self.get_column_metadata(self.inspector.get_columns(table_name=table_name, column_name=column_name)[0])
-
-    # def get_tables_and_views(self) -> List[str]:
-    #     inspector = inspect(self._engine)
-    #     meta = MetaData(bind=self._engine)
-    #     MetaData.reflect(meta, views=True)
-    #     rows = inspector.get_table_names() + inspector.get_view_names()
-    #     if len(rows) == 0:
-    #         raise EmptyDBError("The db is empty it could be a permission issue")
-    #     return [row.lower() for row in rows]
