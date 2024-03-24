@@ -2,7 +2,7 @@ from pydantic import BaseModel
 from typing import Literal, Optional, Any
 from langchain_community.chat_models.azure_openai import AzureChatOpenAI
 
-from text_to_sql.config.settings import AZURE_API_KEY, AZURE_ENDPOINT
+from text_to_sql.config.settings import AZURE_API_KEY, AZURE_ENDPOINT, AZURE_GPT_4
 
 
 class BaseLLMConfig(BaseModel):
@@ -28,25 +28,51 @@ class AzureLLMConfig(BaseLLMConfig):
 
 
 class LLMProxy:
+    """
+    A Proxy class to interact with the LLM
+    """
 
-    @property
-    def azure_llm(self):
-        llm_config = AzureLLMConfig(azure_endpoint=AZURE_ENDPOINT, api_key=AZURE_API_KEY)
+    def __init__(self, llm_name: str = "azure"):
+        self.llm = None
 
-        llm = AzureChatOpenAI(
-            azure_endpoint=llm_config.azure_endpoint,
-            deployment_name=llm_config.deployment_name,
-            model=llm_config.model,
-            openai_api_type="azure",
-            openai_api_version=llm_config.api_version,
-            temperature=llm_config.temperature,
-            max_tokens=llm_config.max_tokens,
-            openai_api_key=llm_config.api_key,
-        )
-        return llm
+        self.init_llm(llm_name)
+
+    def init_llm(self, llm_name: str = "azure"):
+        """
+        init the LLM based on the given LLM name
+        """
+        if llm_name == "azure":
+            if AZURE_GPT_4:
+                llm_config = AzureLLMConfig(
+                    azure_endpoint=AZURE_ENDPOINT, api_key=AZURE_API_KEY, model="gpt-4", deployment_name="gpt-4-turbo"
+                )
+            else:
+                llm_config = AzureLLMConfig(
+                    azure_endpoint=AZURE_ENDPOINT,
+                    api_key=AZURE_API_KEY,
+                    model="gpt-35-turbo",
+                    deployment_name="gpt-35-turbo",
+                )
+
+            llm = AzureChatOpenAI(
+                azure_endpoint=llm_config.azure_endpoint,
+                deployment_name=llm_config.deployment_name,
+                model=llm_config.model,
+                openai_api_type="azure",
+                openai_api_version=llm_config.api_version,
+                temperature=llm_config.temperature,
+                max_tokens=llm_config.max_tokens,
+                openai_api_key=llm_config.api_key,
+            )
+            self.llm = llm
+        else:
+            raise ValueError("Only Azure LLM supported now!")
 
     def get_response_from_llm(self, question: Any, llm_name: str = "azure"):
+        """
+        Get response from the LLM for the given question
+        """
         if llm_name == "azure":
-            return self.azure_llm.invoke(question)
+            return self.llm.invoke(question)
         else:
             raise ValueError("Only Azure LLM supported now!")

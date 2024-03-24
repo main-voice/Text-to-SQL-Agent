@@ -17,6 +17,8 @@ LOGGING_LEVEL = logging.DEBUG if DEBUG else logging.INFO
 # LLM Config
 AZURE_ENDPOINT = os.environ.get("AZURE_ENDPOINT", None)
 AZURE_API_KEY = os.environ.get("AZURE_API_KEY", None)
+# if using gpt4 model
+AZURE_GPT_4 = os.environ.get("AZURE_GPT_4", False)
 
 # Database config
 DB_HOST = os.environ.get("DB_HOST", None)
