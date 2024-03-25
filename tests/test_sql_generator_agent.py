@@ -1,6 +1,7 @@
 import unittest
 from typing import List, Tuple
 
+from text_to_sql.database.db_config import DBConfig
 from text_to_sql.database.db_engine import MySQLEngine
 from text_to_sql.database.db_metadata_manager import DBMetadataManager
 from text_to_sql.llm.llm_proxy import LLMProxy
@@ -13,7 +14,7 @@ logger = get_logger(__name__)
 class TestSQLGeneratorAgent(unittest.TestCase):
     def setUp(self):
         self.sql_generator_agent = SQLGeneratorAgent(
-            db_metadata_manager=DBMetadataManager(MySQLEngine()), llm_proxy=LLMProxy()
+            db_metadata_manager=DBMetadataManager(MySQLEngine(DBConfig())), llm_proxy=LLMProxy()
         )
 
     def test_generate_sql_single_table_with_columns(self):
@@ -38,7 +39,7 @@ class TestSQLGeneratorAgent(unittest.TestCase):
         # for complex query, there is multiple ways to express the same query, so we need to run the query to check
         print(f"Generated SQL for '找到发帖数量最多的用户': {sql}")
 
-        sql_result = self.sql_generator_agent.db_metadata_manager.db_engine.execute_query(sql)
+        sql_result = self.sql_generator_agent.db_metadata_manager.db_engine.execute(sql)
         print(f"SQL result: {sql_result}")
 
         if isinstance(sql_result, List) and isinstance(sql_result[0], Tuple):

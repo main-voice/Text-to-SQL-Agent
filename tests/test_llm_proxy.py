@@ -15,7 +15,7 @@ class TestLLMProxy(unittest.TestCase):
 
     def test_azure_llm_proxy(self):
         llm_proxy = LLMProxy()
-        response = llm_proxy.get_response_from_llm(self.default_question)
+        response = llm_proxy.get_response_from_llm(self.default_question, verbose=True)
         print(response)
         assert response is not None
 

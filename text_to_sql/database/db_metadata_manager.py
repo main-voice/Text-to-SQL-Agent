@@ -19,27 +19,24 @@ class DBMetadataManager:
     Collect the metadata for a given database (including tables info, columns info, primary keys, foreign keys, indexes)
     """
 
-    sql_meta: MetaData
-    inspector: inspect
-    db_engine: DBEngine
-
     def __init__(self, db_engine: DBEngine):
         self.db_engine = db_engine
-        self.create_inspector()
+        self._metadata = MetaData()
+        self._inspector = None
 
-    def create_inspector(self):
-        logger.debug("Creating inspector using connection url...")
+        self.reflect_metadata()
 
-        sqlalchemy_engine = create_engine(self.db_engine.get_connection_url())
-        self.sql_meta = MetaData()
-        self.sql_meta.reflect(bind=sqlalchemy_engine)
-        self.inspector = inspect(sqlalchemy_engine)
-
-        logger.debug("Create inspector successfully.")
-        return self.inspector
+    def reflect_metadata(self):
+        """
+        Reflect the metadata of the database
+        """
+        engine = create_engine(self.db_engine.get_connection_url())
+        self._metadata.reflect(bind=engine)
+        self._inspector = inspect(engine)
+        logger.info(f"Reflected metadata for database {self.db_engine.db_config.db_name}")
 
     def get_db_metadata(self) -> DatabaseMetadata:
-        tables = self.inspector.get_table_names()
+        tables = self._metadata.tables.keys()
         tables_meta = []
 
         for table_name in tables:
@@ -53,7 +50,7 @@ class DBMetadataManager:
         Get metadata for a given table name
         """
 
-        _columns = self.inspector.get_columns(table_name=table_name)
+        _columns = self._inspector.get_columns(table_name=table_name)
         _columns_meta = []
         for column in _columns:
             _columns_meta.append(self.get_column_metadata(column))
@@ -71,4 +68,4 @@ class DBMetadataManager:
         """
         Get metadata for a given column name
         """
-        return self.get_column_metadata(self.inspector.get_columns(table_name=table_name, column_name=column_name)[0])
+        return self.get_column_metadata(self._inspector.get_columns(table_name=table_name, column_name=column_name)[0])
