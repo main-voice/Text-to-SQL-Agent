@@ -1,7 +1,10 @@
+import torch
+from langchain_community.embeddings.huggingface import HuggingFaceEmbeddings
 from pydantic import BaseModel
 from typing import Literal, Optional, Any
 from langchain_community.chat_models.azure_openai import AzureChatOpenAI
-from langchain.callbacks import get_openai_callback
+from langchain_community.callbacks import get_openai_callback
+from langchain_openai import AzureOpenAIEmbeddings
 
 from text_to_sql.config.settings import AZURE_API_KEY, AZURE_ENDPOINT, AZURE_GPT_4
 from text_to_sql.utils.logger import get_logger
@@ -37,38 +40,35 @@ class LLMProxy:
     """
 
     def __init__(self, llm_name: str = "azure"):
+        self.llm_config = None
         self.llm = None
 
-        self.init_llm(llm_name)
-
-    def init_llm(self, llm_name: str = "azure"):
-        """
-        init the LLM based on the given LLM name
-        """
         if llm_name == "azure":
             if AZURE_GPT_4:
-                llm_config = AzureLLMConfig(
-                    azure_endpoint=AZURE_ENDPOINT, api_key=AZURE_API_KEY, model="gpt-4", deployment_name="gpt-4-turbo"
+                self.llm_config = AzureLLMConfig(
+                    azure_endpoint=AZURE_ENDPOINT,
+                    api_key=AZURE_API_KEY,
+                    model="gpt-4",
+                    deployment_name="gpt-4-turbo"
                 )
             else:
-                llm_config = AzureLLMConfig(
+                self.llm_config = AzureLLMConfig(
                     azure_endpoint=AZURE_ENDPOINT,
                     api_key=AZURE_API_KEY,
                     model="gpt-35-turbo",
                     deployment_name="gpt-35-turbo",
                 )
-
-            llm = AzureChatOpenAI(
-                azure_endpoint=llm_config.azure_endpoint,
-                deployment_name=llm_config.deployment_name,
-                model=llm_config.model,
+            self.llm = AzureChatOpenAI(
+                azure_endpoint=self.llm_config.azure_endpoint,
+                deployment_name=self.llm_config.deployment_name,
+                model=self.llm_config.model,
                 openai_api_type="azure",
-                openai_api_version=llm_config.api_version,
-                temperature=llm_config.temperature,
-                max_tokens=llm_config.max_tokens,
-                openai_api_key=llm_config.api_key,
+                openai_api_version=self.llm_config.api_version,
+                temperature=self.llm_config.temperature,
+                max_tokens=self.llm_config.max_tokens,
+                openai_api_key=self.llm_config.api_key,
             )
-            self.llm = llm
+            self.embedding = self.azure_embedding()
         else:
             raise ValueError("Only Azure LLM supported now!")
 
@@ -86,3 +86,29 @@ class LLMProxy:
             return self.llm.invoke(question)
         else:
             raise ValueError("Only Azure LLM supported now!")
+
+    def azure_embedding(self) -> AzureOpenAIEmbeddings:
+        """
+        Create a new AzureOpenAIEmbeddings instance
+        """
+        # The AzureOpenAIEmbeddings class is not available
+        pass
+        return AzureOpenAIEmbeddings(
+            azure_endpoint=self.llm_config.azure_endpoint,
+            deployment=self.llm_config.deployment_name,
+            model="text-embedding-ada-002",
+            openai_api_key=self.llm_config.api_key,
+            openai_api_version=self.llm_config.api_version,
+        )
+
+
+def get_huggingface_embedding():
+    """
+    Return an embedding instance from HuggingFace
+    """
+    # Sentence Transformers for text embeddings
+    model_name = "sentence-transformers/all-mpnet-base-v2"
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    model_kwargs = {"device": device}
+    sentence_embedding = HuggingFaceEmbeddings(model_name=model_name, model_kwargs=model_kwargs)
+    return sentence_embedding

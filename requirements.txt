@@ -5,3 +5,5 @@ langchain-openai
 python-dotenv
 mysql-connector-python
 SQLAlchemy
+pandas
+sentence-transformers
