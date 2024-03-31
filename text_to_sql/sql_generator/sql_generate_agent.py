@@ -1,9 +1,23 @@
 import re
+from typing import Any
+
+from langchain.agents import AgentExecutor, ZeroShotAgent
+from langchain.chains.llm import LLMChain
+from langchain_community.callbacks import get_openai_callback
 
 from text_to_sql.database.db_metadata_manager import DBMetadataManager
-from text_to_sql.llm.llm_proxy import LLMProxy
+from text_to_sql.llm.llm_proxy import LLMProxy, get_huggingface_embedding
+from text_to_sql.sql_generator.sql_agent_tools import SQLAgentToolkits
 from text_to_sql.utils.logger import get_logger
-from text_to_sql.utils.prompt import SYSTEM_PROMPT, SYSTEM_CONSTRAINTS, DB_INTRO
+from text_to_sql.utils.prompt import (
+    SYSTEM_PROMPT_DEPRECATED,
+    SYSTEM_CONSTRAINTS,
+    DB_INTRO,
+    SQL_AGENT_PREFIX,
+    SQL_AGENT_SUFFIX,
+    FORMAT_INSTRUCTIONS,
+    SIMPLE_PLAN,
+)
 
 logger = get_logger(__name__)
 
@@ -16,7 +30,71 @@ class SQLGeneratorAgent:
     def __init__(self, db_metadata_manager: DBMetadataManager, llm_proxy: LLMProxy):
         self.db_metadata_manager = db_metadata_manager
         self.llm_proxy = llm_proxy
-        self.sys_prompt = SYSTEM_PROMPT
+        # TODO: Update the system prompt to use the SQL agent
+        self.sys_prompt = SYSTEM_PROMPT_DEPRECATED
+
+    def create_sql_agent(self):
+        """
+        Create a SQL agent executor using our custom SQL agent tools and LLM
+        """
+        logger.info("Creating SQL agent executor...")
+        # prepare sql agent tools
+        tables_context = self.db_metadata_manager.get_db_metadata().tables
+        embedding = get_huggingface_embedding()
+        agent_tools = SQLAgentToolkits(tables_context=tables_context, embedding=embedding).get_tools()
+        tools_name = [tool.name for tool in agent_tools]
+
+        logger.info(f"The agent tools are: {tools_name}")
+
+        # create sql agent executor
+        prefix = SQL_AGENT_PREFIX.format(plan=SIMPLE_PLAN)
+
+        prompt = ZeroShotAgent.create_prompt(
+            tools=agent_tools, prefix=prefix, suffix=SQL_AGENT_SUFFIX, format_instructions=FORMAT_INSTRUCTIONS
+        )
+
+        llm_chain = LLMChain(llm=self.llm_proxy.llm, prompt=prompt)
+
+        sql_agent = ZeroShotAgent(llm_chain=llm_chain, allowed_tools=tools_name)
+
+        sql_agent_executor = AgentExecutor.from_agent_and_tools(agent=sql_agent, tools=agent_tools)
+
+        logger.info(f"Finished creating SQL agent executor.")
+        return sql_agent_executor
+
+    def generate_sql_with_agent(self, user_query: str, single_line_format: bool=False, verbose=True) -> Any:
+        """
+        Generate SQL statement using custom SQL agent executor
+        """
+        # create an agent executor
+        sql_agent_executor = self.create_sql_agent()
+        sql_agent_executor.return_intermediate_steps = True
+
+        _input = {
+            "input": user_query,
+        }
+
+        with get_openai_callback() as cb:
+            try:
+                response = sql_agent_executor.invoke(_input)
+            except Exception as e:
+                logger.error(f"Failed to generate SQL statement using SQL agent executor. Error: {e}")
+                return ""
+            if verbose:
+                print(cb)
+
+        if not response:
+            logger.error("Failed to generate SQL statement using SQL agent executor.")
+            return ""
+
+        generated_sql = ""
+        if "```sql" in response["output"]:
+            generated_sql = self.extract_sql_from_llm_response(response["output"])
+            generated_sql = self.remove_markdown_format(generated_sql)
+        if single_line_format:
+            generated_sql = self.format_sql(generated_sql)
+
+        return generated_sql
 
     def generate_sql(self, user_query: str, single_line_format: bool = False) -> str:
         """
@@ -26,6 +104,7 @@ class SQLGeneratorAgent:
         :param single_line_format: bool - Whether to return the SQL query as a single line or not
         :return: str - The generated SQL query
         """
+        # TODO: mark this method as deprecated
 
         # Get tables info from metadata manager
         tables_info = self.db_metadata_manager.get_db_metadata().tables
@@ -59,6 +138,7 @@ class SQLGeneratorAgent:
 
         return sql_statement
 
+    # TODO: Move these formatting methods to a Output Parser
     @classmethod
     def format_sql(cls, sql) -> str:
         """

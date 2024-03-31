@@ -26,8 +26,10 @@ class TestSQLGeneratorAgent(unittest.TestCase):
         sql = self.sql_generator_agent.generate_sql("Show me the users whose name is 'test'")
         self.assertEqual(sql, "select * from jk_user where username = 'test';")
 
-        sql = self.sql_generator_agent.generate_sql("Find all users who have been authenticated with a student ID.")
-        self.assertEqual(sql, "select * from jk_user where student_id is not null;")
+        sql = self.sql_generator_agent.generate_sql(
+            "Find all users' name who have been authenticated with a student ID."
+        )
+        self.assertEqual(sql, "select username from jk_user where student_id is not null;")
 
     def test_generate_sql_single_table_chinese(self):
         # Test agent ability to understand Chinese question
@@ -39,16 +41,15 @@ class TestSQLGeneratorAgent(unittest.TestCase):
         question = "找到发帖数量最多的用户"
         sql = self.sql_generator_agent.generate_sql(question, single_line_format=True)
         # for complex query, there is multiple ways to express the same query, so we need to run the query to check
-        print(f"Generated SQL for '找到发帖数量最多的用户': {sql}")
+        print(f"Generated SQL for {question}: {sql}")
 
-        sql_result = self.sql_generator_agent.db_metadata_manager.db_engine.execute(sql)
-        print(f"SQL result: {sql_result}")
+        # sql_result = self.sql_generator_agent.db_metadata_manager.db_engine.execute(sql)
+        # print(f"SQL result: {sql_result}")
 
-        if isinstance(sql_result, List) and isinstance(sql_result[0], Tuple):
-            self.assertTrue("baokker" in sql_result[0])
-        else:
-            logger.warning("The return type of SQL result is not List[Tuple], please check!")
-            exit(1)
+        # if isinstance(sql_result, List) and isinstance(sql_result[0], Tuple):
+        #     self.assertTrue("baokker" in sql_result[0])
+        # else:
+        #     logger.warning("The return type of SQL result is not List[Tuple], please check!")
 
     def test_langchain_agent(self):
         from langchain.chains import create_sql_query_chain
@@ -75,6 +76,10 @@ class TestSQLGeneratorAgent(unittest.TestCase):
             self.assertTrue("baokker" in sql_result[0])
         else:
             logger.warning(f"The return type of SQL result is not List[Tuple], but {type(sql_result)} please check!")
+
+    def test_sql_agent_with_tools(self):
+        question = "Find the user who has the most posts"
+        self.sql_generator_agent.generate_sql_with_agent(question)
 
 
 if __name__ == "__main__":

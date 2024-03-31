@@ -7,3 +7,4 @@ sphinx==7.1.2
 sphinx-autobuild==2021.3.14
 myst-parser==2.0.0
 esbonio==0.16.1
+black==24.3.0

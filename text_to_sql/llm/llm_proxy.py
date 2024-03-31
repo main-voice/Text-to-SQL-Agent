@@ -1,6 +1,6 @@
 import torch
 from langchain_community.embeddings.huggingface import HuggingFaceEmbeddings
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Literal, Optional, Any
 from langchain_community.chat_models.azure_openai import AzureChatOpenAI
 from langchain_community.callbacks import get_openai_callback
@@ -27,11 +27,11 @@ class AzureLLMConfig(BaseLLMConfig):
     Azure LLM configuration class
     """
 
-    azure_endpoint: Optional[str] = None
+    azure_endpoint: Optional[str] = Field(exclude=True, default=None)
     deployment_name: Literal["gpt-4", "gpt-35-turbo", "gpt-4-turbo"] = "gpt-35-turbo"
     model: Literal["gpt-4", "gpt-35-turbo"] = "gpt-35-turbo"
     api_version: str = "2023-08-01-preview"
-    api_key: Optional[str] = None
+    api_key: Optional[str] = Field(exclude=True, default=None)
 
 
 class LLMProxy:
@@ -107,8 +107,13 @@ def get_huggingface_embedding():
     Return an embedding instance from HuggingFace
     """
     # Sentence Transformers for text embeddings
+    logger.info("Loading HuggingFace embeddings...")
+
     model_name = "sentence-transformers/all-mpnet-base-v2"
     device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    logger.info(f"Using device: {device}")
+
     model_kwargs = {"device": device}
     sentence_embedding = HuggingFaceEmbeddings(model_name=model_name, model_kwargs=model_kwargs)
     return sentence_embedding
