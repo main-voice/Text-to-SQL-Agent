@@ -7,10 +7,11 @@ For details: ref to "https://python.langchain.com/docs/modules/agents/tools/"
 
 # TODO: Add a Chinese to English translation tool
 
-from typing import List, Any, Optional
 
 import numpy as np
 import pandas as pd
+
+from typing import List, Any, Optional
 from langchain.callbacks.manager import CallbackManagerForToolRun
 from langchain.tools import BaseTool
 from langchain_community.agent_toolkits.base import BaseToolkit
@@ -60,9 +61,18 @@ class RelevantTablesTool(BaseTool):
         self,
         question: str,
         run_manager: Optional[CallbackManagerForToolRun] = None,
-    ) -> Any:
+    ) -> List[str]:
         """
         Find all possible relevant tables and columns in the database based on user question and db metadata.
+
+        Parameters:
+            question: str
+                The user posed question.
+
+        Returns:
+            A Tuple (A, B)
+            A is a string representation of the most relevant tables and their relevance scores. (for better understanding)
+            B is a list of the most relevant tables name. (for better testing)
         """
         logger.info(f"The Agent is calling tool: {self.name}.")
 
@@ -99,15 +109,22 @@ class RelevantTablesTool(BaseTool):
 
         if df.empty:
             logger.error("No relevant tables found in the database. Please check the input question.")
-            return []
 
         table_similarity_score = df[["table_name", "similarity"]].values.tolist()
+        # format is [['table1', 0.232], ['table2', 0.123]]
+
+        # convert to a string to make it easier to understand for LLM
+        table_similarity_score_str = ""
+        for item in table_similarity_score:
+            table_similarity_score_str += f"Table: {item[0]}, relevance score: {item[1]}\n"
+
         logger.info(
-            f"Found relevant tables and relevance scores: {table_similarity_score} for the question: {question}."
+            f"Found the {self.top_k} most relevant tables and their relevance scores: \
+            {table_similarity_score_str} for the question: {question}."
         )
 
         # Now we have the table names and their relevance scores, return the most relevant tables
-        return df[["table_name"]].values.tolist()
+        return df["table_name"].values.tolist()
 
 
 class InfoTablesTool(BaseTool):
@@ -118,7 +135,8 @@ class InfoTablesTool(BaseTool):
     name = "DatabaseTablesInformation"
     description = """
         Input: A list of table names.
-        Function: Use this tool to get metadata information for a list of tables in the database.
+        Function: Use this tool to get all columns information for the relevant tables.
+                  And identify those possible relevant columns based on the user posed question.
         Output: Metadata for a list of tables.
         
         Input Example: ["table1", "table2"]

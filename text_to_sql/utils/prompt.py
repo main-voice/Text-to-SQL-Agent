@@ -94,6 +94,7 @@ You are an agent designed to interact with a database to generate correct SQL st
 
 ## TASK
 Your task is to understand user question, interact with database using tools I will provided, \
+follow the plan I will provide below,
 and accurately generate the corresponding SQL statements. Return the SQL statement between ```sql and ``` tags.
 
 Here is the plan you need to follow:
@@ -103,7 +104,8 @@ Here is the plan you need to follow:
 # The plan for the SQL agent, mainly describe when to use which tool
 SIMPLE_PLAN = """
 1. Use the DatabaseTablesWithRelevanceScores tool to get relevant tables for the user query.
-2. Use the DatabaseTablesInformation tool to get the metadata information of specific database tables.
+2. Use the DatabaseTablesInformation tool to get all columns information for the relevant tables. \
+    And identify those possible relevant columns based on the user posed question.
 3. Generate the SQL query based on the user input and the database metadata from tools.
 """
 
