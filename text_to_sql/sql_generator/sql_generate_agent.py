@@ -5,7 +5,6 @@ from langchain.agents import AgentExecutor, ZeroShotAgent
 from langchain.chains.llm import LLMChain
 from langchain_community.callbacks import get_openai_callback
 
-from text_to_sql.config.settings import DEBUG
 from text_to_sql.database.db_metadata_manager import DBMetadataManager
 from text_to_sql.llm import LLMProxy, EmbeddingProxy
 from text_to_sql.sql_generator.sql_agent_tools import SQLAgentToolkits
@@ -35,7 +34,7 @@ class SQLGeneratorAgent:
         self.sys_prompt = SYSTEM_PROMPT_DEPRECATED
         self.embedding_proxy = embedding_proxy
 
-    def create_sql_agent(self):
+    def create_sql_agent(self, verbose=True) -> AgentExecutor:
         """
         Create a SQL agent executor using our custom SQL agent tools and LLM
         """
@@ -54,7 +53,7 @@ class SQLGeneratorAgent:
         prompt = ZeroShotAgent.create_prompt(
             tools=agent_tools, prefix=prefix, suffix=SQL_AGENT_SUFFIX, format_instructions=FORMAT_INSTRUCTIONS
         )
-        llm_chain = LLMChain(llm=self.llm_proxy.llm, prompt=prompt, verbose=DEBUG)
+        llm_chain = LLMChain(llm=self.llm_proxy.llm, prompt=prompt, verbose=verbose)
 
         # create sql agent executor
         sql_agent = ZeroShotAgent(llm_chain=llm_chain, allowed_tools=tools_name)
@@ -68,7 +67,7 @@ class SQLGeneratorAgent:
         Generate SQL statement using custom SQL agent executor
         """
         # create an agent executor
-        sql_agent_executor = self.create_sql_agent()
+        sql_agent_executor = self.create_sql_agent(verbose=verbose)
         sql_agent_executor.return_intermediate_steps = True
 
         _input = {

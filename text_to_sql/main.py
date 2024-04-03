@@ -13,5 +13,5 @@ if __name__ == "__main__":
 
     question = "Find the user who has the most posts"
     question_cn = "找到发帖数量最多的用户"
-    result = sql_agent.generate_sql_with_agent(question)
+    result = sql_agent.generate_sql_with_agent(question, verbose=True)
     print(result)

@@ -4,7 +4,7 @@ from text_to_sql.database.db_config import DBConfig
 from text_to_sql.database.db_engine import MySQLEngine
 from text_to_sql.database.db_metadata_manager import DBMetadataManager
 from text_to_sql.llm import EmbeddingProxy
-from text_to_sql.sql_generator.sql_agent_tools import RelevantTablesTool, TablesInfoTool, TablesSchemaTool
+from text_to_sql.sql_generator.sql_agent_tools import RelevantTablesTool, RelevantColumnsInfoTool, TablesSchemaTool
 
 
 class TestAgentSQLTools(unittest.TestCase):
@@ -38,15 +38,15 @@ class TestAgentSQLTools(unittest.TestCase):
         print(result)
         self.assertEqual(result, ["jk_user", "jk_post"])
 
-    def test_get_tables_info_tool(self):
-        tool = TablesInfoTool(db_manager=self.db_metadata_manager)
-        test_tables = ["jk_user", "jk_post"]
-        result = tool._run(test_tables)
-        assert result is not None, f"tables info of {test_tables} is None"
+    def test_get_columns_info_tool(self):
+        tool = RelevantColumnsInfoTool(db_manager=self.db_metadata_manager)
+        test_columns = "jk_user -> id, username, summary; jk_post -> author_id, is_deleted"
+        result = tool._run(test_columns)
+        assert result is not None, f"tables info of {test_columns} is None"
         print(result)
 
     def test_get_tables_schema_tool(self):
         tool = TablesSchemaTool(db_manager=self.db_metadata_manager)
-        test_tables = ["jk_user"]
+        test_tables = "jk_user"
         result = tool._run(test_tables)
         print(result)

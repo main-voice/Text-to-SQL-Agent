@@ -97,16 +97,18 @@ Your task is to understand user question, interact with database using tools I w
 follow the plan I will provide below,
 and accurately generate the corresponding SQL statements. Return the SQL statement between ```sql and ``` tags.
 
-Here is the plan you need to follow:
+Here is the plan you need to follow step by step:
 {plan}
 """
 
 # The plan for the SQL agent, mainly describe when to use which tool
 SIMPLE_PLAN = """
-1. Use the DatabaseTablesWithRelevanceScores tool to get relevant tables for the user query.
-2. Use the DatabaseTablesInformation tool to get all columns information for the relevant tables. \
-    And identify those possible relevant columns based on the user posed question.
-3. Generate the SQL query based on the user input and the database metadata from tools.
+1. Use the DatabaseTablesWithRelevanceScores tool to get possible relevant tables for the user query.
+2. Use the DatabaseRelevantTablesSchema tool to get the schema of the relevant tables, and try your best to 
+identify those potential relevant columns related to user posed question.
+3. Use the DatabaseRelevantColumnsInformation tool to get more information for the potentially relevant columns. \
+    And identify those relevant columns.
+4. Generate the SQL query based on the user input and the database metadata from tools.
 """
 
 # the format instructions for the SQL agent, need to provide the tool names

@@ -8,7 +8,7 @@ For details: ref to "https://python.langchain.com/docs/modules/agents/tools/"
 # TODO: Add a Chinese to English translation tool
 
 
-from typing import List, Any, Optional, Union
+from typing import List, Any, Optional, Union, Dict
 
 import numpy as np
 import pandas as pd
@@ -20,7 +20,7 @@ from langchain_openai import AzureOpenAIEmbeddings
 from pydantic import BaseModel, Field
 
 from text_to_sql.database.db_metadata_manager import DBMetadataManager
-from text_to_sql.database.models import TableMetadata
+from text_to_sql.database.models import TableMetadata, ColumnMetadata
 from text_to_sql.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -50,7 +50,7 @@ class RelevantTablesTool(BaseSQLAgentTool, BaseTool):
         Input: User question.
         Function: Use this tool to generate a set of tables and their relevance scores 
                   to the user posed question.
-        Output: A dictionary with table names as keys and relevance scores as values.
+        Output: A list of the most relevant tables name.
         """
     embedding: Union[HuggingFaceEmbeddings, AzureOpenAIEmbeddings] = Field(exclude=True)
     top_k: int = 5  # The number of most similar tables to return, default is 5
@@ -160,19 +160,22 @@ class RelevantTablesTool(BaseSQLAgentTool, BaseTool):
         return df["table_name"].values.tolist()
 
 
-class TablesInfoTool(BaseSQLAgentTool, BaseTool):
+class RelevantColumnsInfoTool(BaseSQLAgentTool, BaseTool):
     """
-    Return information for given table names.
+    Return information for given columns, including some sample rows.
     """
 
-    name = "DatabaseTablesInformation"
+    name = "DatabaseRelevantColumnsInformation"
     description = """
-        Input: A list of table names.
-        Function: Use this tool to get all columns information for the relevant tables.
-                  And identify those possible relevant columns based on the user posed question.
-        Output: Metadata for the input tables.
+        Input: a mapping list of tables to their columns, separated by semicolons, 
+        where each table is followed by an arrow "->" and its associated columns are listed and separated by commas.
+
+        Output: Details for the given columns in the input tables, including sample rows.
         
-        Input Example: ["table1", "table2"]
+        Function: Use this tool to get more information for the potentially relevant columns. Then filter them 
+        and identify those possible relevant columns based on the user posed question.
+        
+        Example input: table1 -> column1, column2; table2 -> column3, column4;
         """
 
     @property
@@ -181,47 +184,82 @@ class TablesInfoTool(BaseSQLAgentTool, BaseTool):
 
     def _run(
         self,
-        table_names: List[str],
+        table_with_columns: str,
         run_manager: Optional[CallbackManagerForToolRun] = None,
     ) -> Any:
         """
-        Return all available tables in the database.
+        Return all information for the possible relevant columns.
+
+        Parameters:
+            table_with_columns: a mapping list of tables to their columns, separated by semicolons, where each table is
+            followed by an arrow "->" and its associated columns are listed and separated by commas.
+            For example: table1 -> column1, column2; table2 -> column3, column4;
         """
-        if not table_names:
-            raise ValueError("No table names found in the input. Please check the previous tool output.")
+        logger.info(f"The Agent is calling tool: {self.name}. Input table and columns name: {table_with_columns}.")
+
+        table_column_items_list = table_with_columns.split(";")
+        table_with_columns_dict: Dict[str, List[str]] = {}
+
+        for item in table_column_items_list:
+            if "->" not in item:
+                return (
+                    "Bad input format. Please refer to the Example input: "
+                    "table1 -> column1, column2; table2 -> column3, column4;"
+                )
+            _table, _columns = item.split("->")
+            table_name = _table.strip()
+            columns = [_column.strip() for _column in _columns.split(",")]
+            table_with_columns_dict[table_name] = columns
 
         if not self.tables_context:
             raise ValueError("No table metadata found in the database. Please check the database connection.")
 
-        logger.info(f"The Agent is calling tool: {self.name}. Input table names: {table_names}.")
+        all_available_table_names = self.db_manager.get_available_table_names()
+        if not all_available_table_names:
+            raise ValueError("No table names found in the database. Please check the database connection.")
 
-        # Contain all tables and columns string representation
-        tables_info = ""
+        potential_relevant_table_names: list[str] = list(table_with_columns_dict.keys())
 
-        for _table_meta in self.tables_context:
-            if _table_meta.table_name not in table_names:
+        if potential_relevant_table_names:
+            missing_tables = set(potential_relevant_table_names) - set(all_available_table_names)
+            # all potential relevant tables should be a subset of all available tables
+            if missing_tables:
+                raise ValueError(f"Table names: {missing_tables} not found in the database. Please check the input.")
+
+        # For below loop code, table & column variable is from Database, add type hint for better understanding
+        # tables_info & column_info are string representation for the tables and columns in database
+        tables_columns_info: str = ""
+
+        for table in self.tables_context:
+            if table.table_name not in potential_relevant_table_names:
+                # irrelevant table, skip
                 continue
 
-            if _table_meta.description:
-                tables_info += f"Information of Table {_table_meta.table_name}: {_table_meta.description}\n"
-            else:
-                tables_info += f"Information of Table {_table_meta.table_name}:\n"
+            potential_relevant_column_names = table_with_columns_dict[table.table_name]
 
-            for _column in _table_meta.columns:
-                # Extract column name and comment from the column metadata
-                if _column.comment:
-                    tables_info += f"Column name: {_column.column_name}, description: {_column.comment}, \n"
-                else:
-                    tables_info += f"Column name: {_column.column_name}, \n"
+            for potential_relevant_column in potential_relevant_column_names:
+                found_column: bool = False
+                column_info: str = ""
 
-        if not tables_info:
-            raise ValueError(
-                f"No information found for the given tables. Please check the input tables: {table_names}."
-            )
+                column: ColumnMetadata = self.db_manager.get_column_metadata_from_name(
+                    table_name=table.table_name, column_name=potential_relevant_column
+                )
+                if column.column_name:
+                    # The column is found in the database
+                    found_column = True
+                    column_info += f"column name: {column.column_name}, comment: {column.comment}.\n"
+                    sample_rows = self.db_manager.get_sample_data_of_column(
+                        table_name=table.table_name, column_name=column.column_name
+                    )
+                    column_info += f"Sample data of the column: {sample_rows}\n\n"
+                    column_info = "Table: " + table.table_name + ", " + column_info
 
-        logger.debug(f"Found information for the given tables: {tables_info}.")
+                if not found_column:
+                    column_info += f"Table: {table.table_name}, column {column.column_name} not found in database.\n"
 
-        return tables_info
+                tables_columns_info += column_info
+
+        return tables_columns_info
 
 
 class TablesSchemaTool(BaseSQLAgentTool, BaseTool):
@@ -229,27 +267,29 @@ class TablesSchemaTool(BaseSQLAgentTool, BaseTool):
     Return tables schema for the given table names.
     """
 
-    name = "DatabaseTablesSchema"
+    name = "DatabaseRelevantTablesSchema"
     description = """
-        Input: A list of table names.
-        
-        Function: Use this tool to get all columns information for relevant tables and \
-        identify those possible relevant columns with user posed question.
-        
+        Input: A list of potentially relevant table names
         Output: Schema of the input tables.
         
-        Input Example: ["table1", "table2"]
+        Function: Use this tool to get all columns information for relevant tables and \
+        identify those potential columns related to user posed question.
+        
+        Example Input: table1, table2
         """
 
     def _run(
         self,
-        table_names: List[str],
+        table_names: str,
         run_manager: Optional[CallbackManagerForToolRun] = None,
         *args: Any,
         **kwargs: Any,
     ) -> Any:
 
         logger.info(f"The Agent is calling tool: {self.name}. Input table names: {table_names}.")
+
+        table_names = table_names.split(",")
+        table_names = [table_name.strip() for table_name in table_names]
 
         all_available_table_names = self.db_manager.get_available_table_names()
         if not all_available_table_names:
@@ -286,8 +326,12 @@ class SQLAgentToolkits(BaseToolkit):
         relevant_tables_tool = RelevantTablesTool(db_manager=self.db_manager, embedding=self.embedding)
         _tools.append(relevant_tables_tool)
 
-        # Get information for given tables tool
-        tables_info_tool = TablesInfoTool(db_manager=self.db_manager)
+        # Get schema for given tables
+        tables_schema_tool = TablesSchemaTool(db_manager=self.db_manager)
+        _tools.append(tables_schema_tool)
+
+        # Get information for given columns tool
+        tables_info_tool = RelevantColumnsInfoTool(db_manager=self.db_manager)
         _tools.append(tables_info_tool)
 
         return _tools

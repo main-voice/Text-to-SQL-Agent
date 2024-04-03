@@ -68,7 +68,8 @@ class TestSQLGeneratorAgent(unittest.TestCase):
         )
 
         # msg = {"question": "show me the names of all users"}
-        msg = {"question": "找到发帖数量最多的用户"}
+        # msg = {"question": "找到发帖数量最多的用户"}
+        msg = {"question": "Find the user who has the most posts"}
         _sql = sql_chain.invoke(msg)
 
         sql_result = self.sql_generator_agent.db_metadata_manager.db_engine.execute(_sql)
