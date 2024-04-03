@@ -6,7 +6,7 @@ from langchain_community.utilities.sql_database import SQLDatabase
 from text_to_sql.database.db_config import DBConfig
 from text_to_sql.database.db_engine import MySQLEngine
 from text_to_sql.database.db_metadata_manager import DBMetadataManager
-from text_to_sql.llm.llm_proxy import LLMProxy
+from text_to_sql.llm import LLMProxy, EmbeddingProxy
 from text_to_sql.sql_generator.sql_generate_agent import SQLGeneratorAgent
 from text_to_sql.utils.logger import get_logger
 
@@ -16,7 +16,9 @@ logger = get_logger(__name__)
 class TestSQLGeneratorAgent(unittest.TestCase):
     def setUp(self):
         self.sql_generator_agent = SQLGeneratorAgent(
-            db_metadata_manager=DBMetadataManager(MySQLEngine(DBConfig())), llm_proxy=LLMProxy()
+            db_metadata_manager=DBMetadataManager(MySQLEngine(DBConfig())),
+            llm_proxy=LLMProxy(),
+            embedding_proxy=EmbeddingProxy()
         )
 
     def test_generate_sql_single_table_with_columns(self):

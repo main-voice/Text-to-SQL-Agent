@@ -1,10 +1,8 @@
-import torch
-from langchain_community.embeddings.huggingface import HuggingFaceEmbeddings
-from pydantic import BaseModel, Field
 from typing import Literal, Optional, Any
-from langchain_community.chat_models.azure_openai import AzureChatOpenAI
+
 from langchain_community.callbacks import get_openai_callback
-from langchain_openai import AzureOpenAIEmbeddings
+from langchain_openai import AzureChatOpenAI
+from pydantic import BaseModel, Field
 
 from text_to_sql.config.settings import AZURE_API_KEY, AZURE_ENDPOINT, AZURE_GPT_4
 from text_to_sql.utils.logger import get_logger
@@ -46,10 +44,7 @@ class LLMProxy:
         if llm_name == "azure":
             if AZURE_GPT_4:
                 self.llm_config = AzureLLMConfig(
-                    azure_endpoint=AZURE_ENDPOINT,
-                    api_key=AZURE_API_KEY,
-                    model="gpt-4",
-                    deployment_name="gpt-4-turbo"
+                    azure_endpoint=AZURE_ENDPOINT, api_key=AZURE_API_KEY, model="gpt-4", deployment_name="gpt-4-turbo"
                 )
             else:
                 self.llm_config = AzureLLMConfig(
@@ -68,7 +63,6 @@ class LLMProxy:
                 max_tokens=self.llm_config.max_tokens,
                 openai_api_key=self.llm_config.api_key,
             )
-            self.embedding = self.azure_embedding()
         else:
             raise ValueError("Only Azure LLM supported now!")
 
@@ -86,34 +80,3 @@ class LLMProxy:
             return self.llm.invoke(question)
         else:
             raise ValueError("Only Azure LLM supported now!")
-
-    def azure_embedding(self) -> AzureOpenAIEmbeddings:
-        """
-        Create a new AzureOpenAIEmbeddings instance
-        """
-        # The AzureOpenAIEmbeddings class is not available
-        pass
-        return AzureOpenAIEmbeddings(
-            azure_endpoint=self.llm_config.azure_endpoint,
-            deployment=self.llm_config.deployment_name,
-            model="text-embedding-ada-002",
-            openai_api_key=self.llm_config.api_key,
-            openai_api_version=self.llm_config.api_version,
-        )
-
-
-def get_huggingface_embedding():
-    """
-    Return an embedding instance from HuggingFace
-    """
-    # Sentence Transformers for text embeddings
-    logger.info("Loading HuggingFace embeddings...")
-
-    model_name = "sentence-transformers/all-mpnet-base-v2"
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-
-    logger.info(f"Using device: {device}")
-
-    model_kwargs = {"device": device}
-    sentence_embedding = HuggingFaceEmbeddings(model_name=model_name, model_kwargs=model_kwargs)
-    return sentence_embedding

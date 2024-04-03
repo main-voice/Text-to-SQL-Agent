@@ -7,7 +7,7 @@ from langchain_community.callbacks import get_openai_callback
 
 from text_to_sql.config.settings import DEBUG
 from text_to_sql.database.db_metadata_manager import DBMetadataManager
-from text_to_sql.llm.llm_proxy import LLMProxy, get_huggingface_embedding
+from text_to_sql.llm import LLMProxy, EmbeddingProxy
 from text_to_sql.sql_generator.sql_agent_tools import SQLAgentToolkits
 from text_to_sql.utils.logger import get_logger
 from text_to_sql.utils.prompt import (
@@ -28,36 +28,36 @@ class SQLGeneratorAgent:
     A LLM Agent that generates SQL using user input and table metadata
     """
 
-    def __init__(self, db_metadata_manager: DBMetadataManager, llm_proxy: LLMProxy):
+    def __init__(self, db_metadata_manager: DBMetadataManager, llm_proxy: LLMProxy, embedding_proxy: EmbeddingProxy):
         self.db_metadata_manager = db_metadata_manager
         self.llm_proxy = llm_proxy
         # TODO: Update the system prompt to use the SQL agent
         self.sys_prompt = SYSTEM_PROMPT_DEPRECATED
+        self.embedding_proxy = embedding_proxy
 
     def create_sql_agent(self):
         """
         Create a SQL agent executor using our custom SQL agent tools and LLM
         """
         logger.info("Creating SQL agent executor...")
-        # prepare sql agent tools
-        tables_context = self.db_metadata_manager.get_db_metadata().tables
-        embedding = get_huggingface_embedding()
-        agent_tools = SQLAgentToolkits(tables_context=tables_context, embedding=embedding).get_tools()
+
+        # prepare embedding model, the embedding type is from Azure or Huggingface
+        embedding = self.embedding_proxy.get_embedding()
+
+        agent_tools = SQLAgentToolkits(db_manager=self.db_metadata_manager, embedding=embedding).get_tools()
         tools_name = [tool.name for tool in agent_tools]
 
         logger.info(f"The agent tools are: {tools_name}")
 
-        # create sql agent executor
+        # create LLM chain
         prefix = SQL_AGENT_PREFIX.format(plan=SIMPLE_PLAN)
-
         prompt = ZeroShotAgent.create_prompt(
             tools=agent_tools, prefix=prefix, suffix=SQL_AGENT_SUFFIX, format_instructions=FORMAT_INSTRUCTIONS
         )
-
         llm_chain = LLMChain(llm=self.llm_proxy.llm, prompt=prompt, verbose=DEBUG)
 
+        # create sql agent executor
         sql_agent = ZeroShotAgent(llm_chain=llm_chain, allowed_tools=tools_name)
-
         sql_agent_executor = AgentExecutor.from_agent_and_tools(agent=sql_agent, tools=agent_tools)
 
         logger.info(f"Finished creating SQL agent executor.")

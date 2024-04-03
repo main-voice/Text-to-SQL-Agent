@@ -8,22 +8,39 @@ For details: ref to "https://python.langchain.com/docs/modules/agents/tools/"
 # TODO: Add a Chinese to English translation tool
 
 
+from typing import List, Any, Optional, Union
+
 import numpy as np
 import pandas as pd
-
-from typing import List, Any, Optional
 from langchain.callbacks.manager import CallbackManagerForToolRun
 from langchain.tools import BaseTool
 from langchain_community.agent_toolkits.base import BaseToolkit
 from langchain_community.embeddings.huggingface import HuggingFaceEmbeddings
+from langchain_openai import AzureOpenAIEmbeddings
+from pydantic import BaseModel, Field
 
+from text_to_sql.database.db_metadata_manager import DBMetadataManager
 from text_to_sql.database.models import TableMetadata
 from text_to_sql.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
 
-class RelevantTablesTool(BaseTool):
+class BaseSQLAgentTool(BaseModel):
+    """
+    Base class for SQL Agent tools.
+    """
+
+    db_manager: DBMetadataManager = Field(exclude=True)
+
+    class Config(BaseTool.Config):
+        """Config for Pydantic BaseModel"""
+
+        arbitrary_types_allowed = True
+        extra = "allow"
+
+
+class RelevantTablesTool(BaseSQLAgentTool, BaseTool):
     """
     Find all possible relevant tables in the database based on user question and db metadata.
     """
@@ -35,9 +52,12 @@ class RelevantTablesTool(BaseTool):
                   to the user posed question.
         Output: A dictionary with table names as keys and relevance scores as values.
         """
-    tables_context: List[TableMetadata]
-    embedding: HuggingFaceEmbeddings
+    embedding: Union[HuggingFaceEmbeddings, AzureOpenAIEmbeddings] = Field(exclude=True)
     top_k: int = 5  # The number of most similar tables to return, default is 5
+
+    @property
+    def tables_context(self) -> List[TableMetadata]:
+        return self.db_manager.get_db_metadata().tables
 
     def generate_embedding(self, text: str) -> List[float]:
         """
@@ -60,6 +80,7 @@ class RelevantTablesTool(BaseTool):
     def _run(
         self,
         question: str,
+        remove_prefix: bool = False,
         run_manager: Optional[CallbackManagerForToolRun] = None,
     ) -> List[str]:
         """
@@ -85,20 +106,26 @@ class RelevantTablesTool(BaseTool):
         tables_cols_str = []
 
         # Convert table metadata to a string
-        for _table_meta in self.tables_context:
-            _columns_str = ""
-            for _column in _table_meta.columns:
+        for table in self.tables_context:
+            # if remove prefix ...
+            if remove_prefix:
+                table_name = table.table_name.replace("jk_", "", 1)
+            else:
+                table_name = table.table_name
+
+            columns_str = ""
+            for column in table.columns:
                 # Extract column name and comment from the column metadata to generate embedding
-                if _column.comment:
-                    _columns_str += f"{_column.column_name}: {_column.comment}, "
+                if column.comment:
+                    columns_str += f"{column.column_name}: {column.comment}, "
                 else:
-                    _columns_str += f"{_column.column_name}, "
+                    columns_str += f"{column.column_name}, "
 
-            _table_str = f"Table {_table_meta.table_name} contain columns: [{_columns_str}]."
-            if _table_meta.description:
-                _table_str += f" and table description: {_table_meta.description}"
+            table_str = f"Table {table_name} contain columns: [{columns_str}]."
+            if table.description:
+                table_str += f" and table description: {table.description}"
 
-            tables_cols_str.append([_table_meta.table_name, _table_str])
+            tables_cols_str.append([table_name, table_str])
 
         df = pd.DataFrame(tables_cols_str, columns=["table_name", "table_col_str"])
         df["embedding"] = self.generate_doc_embedding(df["table_col_str"].tolist())
@@ -124,10 +151,16 @@ class RelevantTablesTool(BaseTool):
         )
 
         # Now we have the table names and their relevance scores, return the most relevant tables
+        # recover the table names (add jk_ prefix again)
+        if remove_prefix:
+            tables_name = df["table_name"].values.tolist()
+            restored_tables_name = [f"jk_{table_name}" for table_name in tables_name if table_name != "oss_auth"]
+            return restored_tables_name
+
         return df["table_name"].values.tolist()
 
 
-class InfoTablesTool(BaseTool):
+class TablesInfoTool(BaseSQLAgentTool, BaseTool):
     """
     Return information for given table names.
     """
@@ -137,11 +170,14 @@ class InfoTablesTool(BaseTool):
         Input: A list of table names.
         Function: Use this tool to get all columns information for the relevant tables.
                   And identify those possible relevant columns based on the user posed question.
-        Output: Metadata for a list of tables.
+        Output: Metadata for the input tables.
         
         Input Example: ["table1", "table2"]
         """
-    tables_context: List[TableMetadata]
+
+    @property
+    def tables_context(self) -> List[TableMetadata]:
+        return self.db_manager.get_db_metadata().tables
 
     def _run(
         self,
@@ -188,24 +224,70 @@ class InfoTablesTool(BaseTool):
         return tables_info
 
 
+class TablesSchemaTool(BaseSQLAgentTool, BaseTool):
+    """
+    Return tables schema for the given table names.
+    """
+
+    name = "DatabaseTablesSchema"
+    description = """
+        Input: A list of table names.
+        
+        Function: Use this tool to get all columns information for relevant tables and \
+        identify those possible relevant columns with user posed question.
+        
+        Output: Schema of the input tables.
+        
+        Input Example: ["table1", "table2"]
+        """
+
+    def _run(
+        self,
+        table_names: List[str],
+        run_manager: Optional[CallbackManagerForToolRun] = None,
+        *args: Any,
+        **kwargs: Any,
+    ) -> Any:
+
+        logger.info(f"The Agent is calling tool: {self.name}. Input table names: {table_names}.")
+
+        all_available_table_names = self.db_manager.get_available_table_names()
+        if not all_available_table_names:
+            raise ValueError("No table names found in the database. Please check the database connection.")
+
+        if not table_names:
+            missing_tables = set(all_available_table_names) - set(table_names)
+            if missing_tables:
+                raise ValueError(f"Table names: {missing_tables} not found in the database. Please check the input.")
+
+        tables_schema = [self.db_manager.get_table_schema(table_name) for table_name in table_names]
+        return tables_schema
+
+
 class SQLAgentToolkits(BaseToolkit):
     """
     Return all available tools that the SQL Agent need.
     """
 
-    tables_context: List[TableMetadata]
-    embedding: HuggingFaceEmbeddings
+    db_manager: DBMetadataManager = Field(exclude=True)
+    embedding: Union[HuggingFaceEmbeddings, AzureOpenAIEmbeddings] = Field(exclude=True)
+
+    class Config(BaseToolkit.Config):
+        """Config for Pydantic BaseModel"""
+
+        arbitrary_types_allowed = True
+        extra = "allow"
 
     def get_tools(self) -> List[BaseTool]:
         # TODO: Add tools choice for the agent
         _tools = []
 
         # Find relevant tables tool
-        relevant_tables_tool = RelevantTablesTool(tables_context=self.tables_context, embedding=self.embedding)
+        relevant_tables_tool = RelevantTablesTool(db_manager=self.db_manager, embedding=self.embedding)
         _tools.append(relevant_tables_tool)
 
         # Get information for given tables tool
-        info_tables_tool = InfoTablesTool(tables_context=self.tables_context)
-        _tools.append(info_tables_tool)
+        tables_info_tool = TablesInfoTool(db_manager=self.db_manager)
+        _tools.append(tables_info_tool)
 
         return _tools

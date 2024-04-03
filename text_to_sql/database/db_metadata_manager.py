@@ -3,6 +3,7 @@ This file is used to obtain the metadata of the database based on SqlAlchemy pac
 """
 
 from sqlalchemy import create_engine, MetaData, inspect
+from sqlalchemy.sql.ddl import CreateTable
 
 from text_to_sql.utils.logger import get_logger
 from .db_engine import DBEngine
@@ -69,3 +70,28 @@ class DBMetadataManager:
         Get metadata for a given column name
         """
         return self.get_column_metadata(self._inspector.get_columns(table_name=table_name, column_name=column_name)[0])
+
+    def get_available_table_names(self):
+        """
+        return the list of table names in the database
+        """
+        return self._metadata.tables.keys()
+
+    def get_table_schema(self, table_name: str) -> str:
+        """
+        return the schema of the table
+        """
+        table_meta = self._metadata.tables[table_name]
+        _engine = create_engine(self.db_engine.get_connection_url())
+        table_ddl = str(CreateTable(table_meta).compile(_engine))
+
+        return table_ddl
+
+    def get_tables_schema(self, table_names: list) -> dict:
+        """
+        return the schema of the tables
+        """
+        tables_schema = {}
+        for table_name in table_names:
+            tables_schema[table_name] = self.get_table_schema(table_name)
+        return tables_schema

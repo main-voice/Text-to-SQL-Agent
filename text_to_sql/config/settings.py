@@ -25,6 +25,10 @@ if AZURE_GPT_4 and AZURE_GPT_4.lower() == "true":
 else:
     AZURE_GPT_4 = False
 
+# Embedding model
+AZURE_EMBEDDING_MODEL = os.environ.get("AZURE_EMBEDDING_MODEL", None)
+HUGGING_FACE_EMBEDDING_MODEL = os.environ.get("HUGGING_FACE_EMBEDDING_MODEL", None)
+
 # Database config
 DB_HOST = os.environ.get("DB_HOST", None)
 DB_USER = os.environ.get("DB_USER", None)

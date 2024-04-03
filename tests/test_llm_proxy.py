@@ -1,6 +1,8 @@
 import unittest
-from text_to_sql.llm.llm_proxy import LLMProxy
+
 from langchain_core.messages import HumanMessage, SystemMessage
+
+from text_to_sql.llm import LLMProxy
 
 
 class TestLLMProxy(unittest.TestCase):
