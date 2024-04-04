@@ -1,10 +1,13 @@
 import re
 from typing import Any
 
+from deprecated import deprecated
 from langchain.agents import AgentExecutor, ZeroShotAgent
 from langchain.chains.llm import LLMChain
 from langchain_community.callbacks import get_openai_callback
 
+from text_to_sql.database.db_config import DBConfig
+from text_to_sql.database.db_engine import MySQLEngine
 from text_to_sql.database.db_metadata_manager import DBMetadataManager
 from text_to_sql.llm import LLMProxy, EmbeddingProxy
 from text_to_sql.sql_generator.sql_agent_tools import SQLAgentToolkits
@@ -27,11 +30,9 @@ class SQLGeneratorAgent:
     A LLM Agent that generates SQL using user input and table metadata
     """
 
-    def __init__(self, db_metadata_manager: DBMetadataManager, llm_proxy: LLMProxy, embedding_proxy: EmbeddingProxy):
-        self.db_metadata_manager = db_metadata_manager
+    def __init__(self, llm_proxy: LLMProxy, embedding_proxy: EmbeddingProxy):
+        self.db_metadata_manager = DBMetadataManager(MySQLEngine(DBConfig()))
         self.llm_proxy = llm_proxy
-        # TODO: Update the system prompt to use the SQL agent
-        self.sys_prompt = SYSTEM_PROMPT_DEPRECATED
         self.embedding_proxy = embedding_proxy
 
     def create_sql_agent(self, verbose=True) -> AgentExecutor:
@@ -96,6 +97,7 @@ class SQLGeneratorAgent:
 
         return generated_sql
 
+    @deprecated(version="0.1.0", reason="This function only use simple prompt, use generate_sql_with_agent instead")
     def generate_sql(self, user_query: str, single_line_format: bool = False) -> str:
         """
         Generate SQL statement using user input and table metadata
@@ -104,14 +106,14 @@ class SQLGeneratorAgent:
         :param single_line_format: bool - Whether to return the SQL query as a single line or not
         :return: str - The generated SQL query
         """
-        # TODO: mark this method as deprecated
 
         # Get tables info from metadata manager
         tables_info = self.db_metadata_manager.get_db_metadata().tables
         tables_info_json = [str(table) for table in tables_info]
 
         # Generate SQL statement using LLM proxy
-        question = self.sys_prompt.format(
+        prompt = SYSTEM_PROMPT_DEPRECATED
+        question = prompt.format(
             metadata=tables_info_json, user_input=user_query, system_constraints=SYSTEM_CONSTRAINTS, db_intro=DB_INTRO
         )
 

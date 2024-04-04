@@ -66,17 +66,14 @@ class LLMProxy:
         else:
             raise ValueError("Only Azure LLM supported now!")
 
-    def get_response_from_llm(self, question: Any, llm_name: str = "azure", verbose: bool = False):
+    def get_response_from_llm(self, question: Any, verbose: bool = False):
         """
         Get response from the LLM for the given question
         """
-        if llm_name == "azure":
-            if verbose:
-                with get_openai_callback() as cb:
-                    _response = self.llm.invoke(question)
-                    logger.info(f"Token usage: {cb.total_tokens}")
-                    return _response
+        if verbose:
+            with get_openai_callback() as cb:
+                _response = self.llm.invoke(question)
+                logger.info(f"Token usage: {cb.total_tokens}")
+                return _response
 
-            return self.llm.invoke(question)
-        else:
-            raise ValueError("Only Azure LLM supported now!")
+        return self.llm.invoke(question)

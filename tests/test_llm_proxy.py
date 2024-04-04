@@ -23,11 +23,11 @@ class TestLLMProxy(unittest.TestCase):
 
     def test_openai_llm_proxy(self):
         """
-        Test openai llm, should accept a ValueError as haven't integrate openai llm
+        Test openai llm, should accept a ValueError as haven't integrated openai llm
         """
         with self.assertRaises(ValueError):
-            llm_proxy = LLMProxy()
-            response = llm_proxy.get_response_from_llm(self.default_question, llm_name="openai")
+            llm_proxy = LLMProxy(llm_name="openai")
+            response = llm_proxy.get_response_from_llm(self.default_question)
 
 
 if __name__ == "__main__":
