@@ -1,9 +1,7 @@
-from typing import Union
-from abc import ABC
+from abc import ABC, abstractmethod
+from typing import Dict, Any, List
 
 import mysql.connector
-from mysql.connector.abstracts import MySQLConnectionAbstract
-from mysql.connector.pooling import PooledMySQLConnection
 
 from text_to_sql.utils.logger import get_logger
 from .db_config import DBConfig
@@ -13,56 +11,50 @@ logger = get_logger(__name__)
 
 class DBEngine(ABC):
     """
-    A class to interact with database
+    An abstract class for database engine
     """
 
-    db_config: DBConfig
-    db_connection: None
-    is_connected: bool = False  # Store the status of the connection
+    def __init__(self, db_config: DBConfig):
+        self.db_config = db_config
+        self.connection = None
+        self.is_connected = False  # Flag to check if the database is already connected
 
-    def __init__(self, config: DBConfig = None):
-        self.db_config = config if config else DBConfig()
+    @abstractmethod
+    def connect(self):
+        pass
 
-    def create_connection(self):
-        raise NotImplementedError("create_connection method is not implemented")
-
+    @abstractmethod
     def get_connection_url(self):
-        raise NotImplementedError("get_connection_url method is not implemented")
+        pass
 
-    def close_connection(self):
-        raise NotImplementedError("close_connection method is not implemented")
+    @abstractmethod
+    def disconnect(self):
+        pass
 
-    def execute_query(self, query):
-        raise NotImplementedError("execute_query method is not implemented")
+    @abstractmethod
+    def execute(self, statement: str, params: Dict[str, Any] = None) -> List[Dict[str, Any]]:
+        pass
 
 
 class MySQLEngine(DBEngine):
     """
-    A class to interact with MySQL database
+    MySQL database engine
     """
 
-    # actually type of db_connection is MySQLConnection, but we use Union to avoid warning
-    db_connection: Union[PooledMySQLConnection | MySQLConnectionAbstract]
-
-    def __init__(self, config: DBConfig = None):
-        super().__init__(config)
-
-    def create_connection(self):
+    def connect(self):
         # By default, we use the info in the .env file as the name of the database
         try:
-            self.db_connection = mysql.connector.connect(
+            self.connection = mysql.connector.connect(
                 host=self.db_config.db_host,
                 user=self.db_config.db_user,
                 password=self.db_config.db_password,
                 database=self.db_config.db_name,
             )
-            logger.info(f"Connect to {self.db_config.db_name} successfully")
             self.is_connected = True
-            return self.db_connection
-
-        except mysql.connector.Error as err:
-            logger.error(f"Error when connecting {self.db_config.db_name}: {err}")
-            raise err
+            logger.info(f"Connected to MySQL database {self.db_config.db_name} successfully")
+        except Exception as e:
+            logger.error(f"Failed to connect to MySQL database {self.db_config.db_name}: {e}")
+            raise e
 
     def get_connection_url(self):
         if self.db_config.db_type == "mysql":
@@ -72,50 +64,39 @@ class MySQLEngine(DBEngine):
                 f"@{self.db_config.db_host}:{default_port}/{self.db_config.db_name}"
             )
 
-    def close_connection(self):
+    def disconnect(self):
         """
         Close the database connection to avoid resource leaks
         """
         # Check if the connection is already closed
-        if not self.is_connected:
-            return
-
-        try:
-            self.db_connection.close()
+        if self.connection:
+            self.connection.close()
             self.is_connected = False
-            logger.info(f"Close connection to {self.db_config.db_name} successfully")
-        except mysql.connector.Error as err:
-            logger.error(f"Error when closing connection to {self.db_config.db_name}: {err}")
-            raise err
+            logger.info(f"Disconnected from MySQL database {self.db_config.db_name}")
 
-    def execute_query(self, query):
+    def execute(self, statement: str, params: Dict[str, Any] = None) -> List[Dict[str, Any]]:
         """
         Execute a query to the database
         """
         # Check if the connection is already connected
-        if not self.is_connected:
-            self.create_connection()
-
-        if not isinstance(query, str) or not query.strip():
-            raise ValueError("Query must be a non-empty string")
-
-        query = query.strip().lower()
-
-        cursor = self.db_connection.cursor()
+        if self.is_connected is False:
+            self.connect()
 
         try:
-            if query.lower().startswith("select"):
-                logger.info(f"Executing SELECT query '{query}'")
-                cursor.execute(query)
-                return cursor.fetchall()
-            else:
-                supported_query = "SELECT"
-                raise ValueError(f"Only {supported_query} queries are supported for now!")
-        except mysql.connector.Error as err:
-            logger.error(f"Error when executing query: {err}")
-            raise err
+            with self.connection.cursor() as cursor:
+                cursor.execute(statement, params)
+                if statement.lower().startswith("select"):
+                    logger.info(f"Executing SELECT query '{statement}'")
+                    columns = [col[0] for col in cursor.description]
+                    return [dict(zip(columns, row)) for row in cursor.fetchall()]
+                else:
+                    supported_query = ["SELECT"]
+                    raise ValueError(f"Only {supported_query} queries are supported for now!")
+                    # self.connection.commit()
+                    # return []
+        except Exception as e:
+            logger.error(f"Failed to execute sql statement {statement}, error is {e}")
+            raise e
         finally:
-            # Firstly, close the cursor
-            cursor.close()
-            # Close database connection after executing the query
-            self.close_connection()
+            if cursor:
+                cursor.close()

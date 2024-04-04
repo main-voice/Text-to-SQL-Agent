@@ -14,6 +14,9 @@ class DBConfig:
         self._db_user = db_user if db_user else DB_USER
         self._db_password = db_password if db_password else DB_PASSWORD
 
+    def __repr__(self):
+        return f"DBConfig(db_type={self._db_type}, db_host={self._db_host}, db_name={self._db_name}, db_user={self._db_user})"
+
     @property
     # Use property to wrapper the config info
     def db_type(self):

@@ -1,5 +1,6 @@
 import unittest
 
+from text_to_sql.database.db_config import DBConfig
 from text_to_sql.database.db_metadata_manager import DBMetadataManager
 from text_to_sql.database.db_engine import MySQLEngine
 
@@ -11,7 +12,7 @@ class TestDBMetadataManager(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        test_engine = MySQLEngine()
+        test_engine = MySQLEngine(DBConfig())
         cls.db_metadata_manager = DBMetadataManager(test_engine)
 
     def test_get_db_metadata(self):

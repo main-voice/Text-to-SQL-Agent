@@ -31,12 +31,12 @@
   "python.testing.pytestEnabled": true,
   "python.testing.pytestArgs": ["--no-header", "--capture=no"],
   // Linting
-  "pylint.path": ["${workspaceFolder}/venv/Scripts/pylint"],
+  "pylint.path": ["${workspaceFolder}/venv/bin/pylint"],
   "pylint.args": ["--rcfile=${workspaceFolder}/.linting/.pylintrc"],
 
-  "flake8.path": ["${workspaceFolder}/venv/Scripts/flake8"],
+  "flake8.path": ["${workspaceFolder}/venv/bin/flake8"],
   "flake8.args": ["--config=${workspaceFolder}/.linting/.flake8"],
 
-  "isort.path": ["${workspaceFolder}/venv/Scripts/isort"],
+  "isort.path": ["${workspaceFolder}/venv/bin/isort"],
   "isort.args": ["--settings-path=${workspaceFolder}/.linting/pyproject.toml"]
 }

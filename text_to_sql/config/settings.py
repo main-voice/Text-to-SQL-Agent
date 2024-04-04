@@ -17,6 +17,17 @@ LOGGING_LEVEL = logging.DEBUG if DEBUG else logging.INFO
 # LLM Config
 AZURE_ENDPOINT = os.environ.get("AZURE_ENDPOINT", None)
 AZURE_API_KEY = os.environ.get("AZURE_API_KEY", None)
+# if using gpt4 model
+AZURE_GPT_4 = os.environ.get("AZURE_GPT_4", False)
+# the env variable is a string, so we need to convert it to a boolean
+if AZURE_GPT_4 and AZURE_GPT_4.lower() == "true":
+    AZURE_GPT_4 = True
+else:
+    AZURE_GPT_4 = False
+
+# Embedding model
+AZURE_EMBEDDING_MODEL = os.environ.get("AZURE_EMBEDDING_MODEL", None)
+HUGGING_FACE_EMBEDDING_MODEL = os.environ.get("HUGGING_FACE_EMBEDDING_MODEL", None)
 
 # Database config
 DB_HOST = os.environ.get("DB_HOST", None)

@@ -1,6 +1,12 @@
 openai
 pydantic<2.*
 langchain
+langchain-openai
 python-dotenv
 mysql-connector-python
 SQLAlchemy
+pandas
+sentence-transformers
+torch
+numpy
+deprecated
