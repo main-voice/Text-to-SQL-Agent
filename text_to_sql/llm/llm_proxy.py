@@ -1,5 +1,11 @@
-from typing import Literal, Optional, Any
+"""
+Proxy class to supported LLM client
+"""
 
+from typing import Any, Literal, Optional
+
+# Seems pylint can't handle import package dynamically
+# pylint: disable=no-name-in-module
 from langchain_community.callbacks import get_openai_callback
 from langchain_openai import AzureChatOpenAI
 from pydantic import BaseModel, Field

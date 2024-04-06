@@ -2,12 +2,13 @@
 This file is used to obtain the metadata of the database based on SqlAlchemy package
 """
 
-from sqlalchemy import create_engine, MetaData, inspect
+from sqlalchemy import MetaData, create_engine, inspect
 from sqlalchemy.sql.ddl import CreateTable
 
 from text_to_sql.utils.logger import get_logger
+
 from .db_engine import DBEngine
-from .models import ColumnMetadata, TableMetadata, DatabaseMetadata
+from .models import ColumnMetadata, DatabaseMetadata, TableMetadata
 
 # Notice, Engine is a class from sqlalchemy, while DBEngine is a class from db_engine.py, which is used to interact
 # with the database

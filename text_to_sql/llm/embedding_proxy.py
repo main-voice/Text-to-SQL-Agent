@@ -1,16 +1,17 @@
+"""
+Proxy class to supported embedding models
+"""
+
 from pathlib import Path
-from typing import Any, List, Union, Optional
+from typing import Any, List, Optional, Union
 
 import torch
 from langchain_community.embeddings.huggingface import HuggingFaceEmbeddings
 from langchain_openai import AzureOpenAIEmbeddings
-from sentence_transformers import SentenceTransformer
 from pydantic import BaseModel, validator
+from sentence_transformers import SentenceTransformer
 
-from text_to_sql.config.settings import (
-    AZURE_API_KEY,
-    AZURE_ENDPOINT,
-)
+from text_to_sql.config.settings import AZURE_API_KEY, AZURE_ENDPOINT
 from text_to_sql.utils.logger import get_logger
 
 logger = get_logger(__name__)

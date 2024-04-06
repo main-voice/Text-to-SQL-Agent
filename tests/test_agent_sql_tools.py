@@ -4,7 +4,11 @@ from text_to_sql.database.db_config import DBConfig
 from text_to_sql.database.db_engine import MySQLEngine
 from text_to_sql.database.db_metadata_manager import DBMetadataManager
 from text_to_sql.llm import EmbeddingProxy
-from text_to_sql.sql_generator.sql_agent_tools import RelevantTablesTool, RelevantColumnsInfoTool, TablesSchemaTool
+from text_to_sql.sql_generator.sql_agent_tools import (
+    RelevantColumnsInfoTool,
+    RelevantTablesTool,
+    TablesSchemaTool,
+)
 
 
 class TestAgentSQLTools(unittest.TestCase):

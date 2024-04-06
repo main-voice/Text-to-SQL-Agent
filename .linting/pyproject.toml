@@ -9,4 +9,4 @@ force_grid_wrap=0
 use_parentheses=true
 line_length=120
 profile="black"
-known_first_party="sql_agent"
+known_first_party="text_to_sql"

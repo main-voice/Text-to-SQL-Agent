@@ -1,9 +1,14 @@
+"""
+Connect to database
+"""
+
 from abc import ABC, abstractmethod
-from typing import Dict, Any, List
+from typing import Any, Dict, List
 
 import mysql.connector
 
 from text_to_sql.utils.logger import get_logger
+
 from .db_config import DBConfig
 
 logger = get_logger(__name__)

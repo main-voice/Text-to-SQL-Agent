@@ -27,7 +27,7 @@ class TestLLMProxy(unittest.TestCase):
         """
         with self.assertRaises(ValueError):
             llm_proxy = LLMProxy(llm_name="openai")
-            response = llm_proxy.get_response_from_llm(self.default_question)
+            llm_proxy.get_response_from_llm(self.default_question)
 
 
 if __name__ == "__main__":

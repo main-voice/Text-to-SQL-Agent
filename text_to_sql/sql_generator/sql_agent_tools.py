@@ -8,7 +8,7 @@ For details: ref to "https://python.langchain.com/docs/modules/agents/tools/"
 # TODO: Add a Chinese to English translation tool
 
 
-from typing import List, Any, Optional, Union, Dict
+from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -20,7 +20,7 @@ from langchain_openai import AzureOpenAIEmbeddings
 from pydantic import BaseModel, Field
 
 from text_to_sql.database.db_metadata_manager import DBMetadataManager
-from text_to_sql.database.models import TableMetadata, ColumnMetadata
+from text_to_sql.database.models import ColumnMetadata, TableMetadata
 from text_to_sql.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -91,9 +91,7 @@ class RelevantTablesTool(BaseSQLAgentTool, BaseTool):
                 The user posed question.
 
         Returns:
-            A Tuple (A, B)
-            A is a string representation of the most relevant tables and their relevance scores. (for better understanding)
-            B is a list of the most relevant tables name. (for better testing)
+            A list of the most relevant tables name.
         """
         logger.info(f"The Agent is calling tool: {self.name}.")
 
