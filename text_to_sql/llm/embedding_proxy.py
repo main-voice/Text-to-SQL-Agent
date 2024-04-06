@@ -1,8 +1,10 @@
+from pathlib import Path
 from typing import Any, List, Union, Optional
 
 import torch
 from langchain_community.embeddings.huggingface import HuggingFaceEmbeddings
 from langchain_openai import AzureOpenAIEmbeddings
+from sentence_transformers import SentenceTransformer
 from pydantic import BaseModel, validator
 
 from text_to_sql.config.settings import (
@@ -92,7 +94,7 @@ class HuggingFaceEmbedding(BaseEmbedding, BaseModel):
             raise ValueError(f"Model {model_name} is not available. Available models are: {cls._available_models}")
         return model_name
 
-    def get_embedding_model(self) -> HuggingFaceEmbeddings:
+    def get_embedding_model(self) -> HuggingFaceEmbeddings | SentenceTransformer:
         """
         Get a Hugging Face model
         """
@@ -100,14 +102,17 @@ class HuggingFaceEmbedding(BaseEmbedding, BaseModel):
         if self.embedding:
             return self.embedding
 
-        logger.info(f"You are using model: {self.model_name}")
-
         device = "cuda" if torch.cuda.is_available() else "cpu"
 
         logger.info(f"Using device: {device}")
+        cache_folder = str(Path(__file__).resolve().parent / "model_assets")
 
         model_kwargs = {"device": device}
-        sentence_embedding = HuggingFaceEmbeddings(model_name=self.model_name, model_kwargs=model_kwargs)
+        sentence_embedding = HuggingFaceEmbeddings(
+            model_name=self.model_name,
+            cache_folder=cache_folder,
+            model_kwargs=model_kwargs,
+        )
         return sentence_embedding
 
 
