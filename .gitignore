@@ -160,3 +160,6 @@ cython_debug/
 #.idea/
 junit.xml
 .idea/
+
+# models
+text_to_sql/llm/model_assets/

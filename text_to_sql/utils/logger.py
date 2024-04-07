@@ -1,3 +1,7 @@
+"""
+Create a custom logger with time and file name
+"""
+
 import logging
 
 from text_to_sql.config.settings import LOGGING_LEVEL

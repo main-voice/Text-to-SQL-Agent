@@ -32,8 +32,9 @@ class TestEmbedding(unittest.TestCase):
             EmbeddingProxy(embedding_source="huggingface", model_name=test_model_name).get_embedding()
 
     def test_huggingface_embedding_with_name(self):
-        embedding = EmbeddingProxy(embedding_source="huggingface",
-                                   model_name="sentence-transformers/all-mpnet-base-v2").get_embedding()
+        embedding = EmbeddingProxy(
+            embedding_source="huggingface", model_name="sentence-transformers/all-mpnet-base-v2"
+        ).get_embedding()
         result = embedding.embed_query(self.default_str)
         print(result)
         self.assertTrue(isinstance(result, List))

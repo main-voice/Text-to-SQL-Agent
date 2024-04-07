@@ -1,25 +1,31 @@
+"""
+The main SQLGeneratorAgent class is responsible for generating SQL statements using a custom SQL agent executor.
+"""
+
 import re
 from typing import Any
 
 from deprecated import deprecated
 from langchain.agents import AgentExecutor, ZeroShotAgent
 from langchain.chains.llm import LLMChain
+
+# pylint: disable=no-name-in-module
 from langchain_community.callbacks import get_openai_callback
 
 from text_to_sql.database.db_config import DBConfig
 from text_to_sql.database.db_engine import MySQLEngine
 from text_to_sql.database.db_metadata_manager import DBMetadataManager
-from text_to_sql.llm import LLMProxy, EmbeddingProxy
+from text_to_sql.llm import EmbeddingProxy, LLMProxy
 from text_to_sql.sql_generator.sql_agent_tools import SQLAgentToolkits
 from text_to_sql.utils.logger import get_logger
 from text_to_sql.utils.prompt import (
-    SYSTEM_PROMPT_DEPRECATED,
-    SYSTEM_CONSTRAINTS,
     DB_INTRO,
-    SQL_AGENT_PREFIX,
-    SQL_AGENT_SUFFIX,
     FORMAT_INSTRUCTIONS,
     SIMPLE_PLAN,
+    SQL_AGENT_PREFIX,
+    SQL_AGENT_SUFFIX,
+    SYSTEM_CONSTRAINTS,
+    SYSTEM_PROMPT_DEPRECATED,
 )
 
 logger = get_logger(__name__)
@@ -60,7 +66,7 @@ class SQLGeneratorAgent:
         sql_agent = ZeroShotAgent(llm_chain=llm_chain, allowed_tools=tools_name)
         sql_agent_executor = AgentExecutor.from_agent_and_tools(agent=sql_agent, tools=agent_tools)
 
-        logger.info(f"Finished creating SQL agent executor.")
+        logger.info("Finished creating SQL agent executor.")
         return sql_agent_executor
 
     def generate_sql_with_agent(self, user_query: str, single_line_format: bool = False, verbose=True) -> Any:
@@ -79,7 +85,8 @@ class SQLGeneratorAgent:
             try:
                 response = sql_agent_executor.invoke(_input)
             except Exception as e:
-                logger.error(f"Failed to generate SQL statement using SQL agent executor. Error: {e}")
+                logger.error(f"Failed to generate SQL statement using SQL agent executor. Error: {e}, "
+                             f"error type: {type(e).__name__}")
                 return ""
             if verbose:
                 print(cb)

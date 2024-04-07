@@ -1,8 +1,8 @@
 import unittest
 
 from text_to_sql.database.db_config import DBConfig
-from text_to_sql.database.db_metadata_manager import DBMetadataManager
 from text_to_sql.database.db_engine import MySQLEngine
+from text_to_sql.database.db_metadata_manager import DBMetadataManager
 
 
 class TestDBMetadataManager(unittest.TestCase):

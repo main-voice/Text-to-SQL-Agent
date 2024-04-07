@@ -2,7 +2,8 @@
 This file is to store all pydantic models related to database, not AI models
 """
 
-from typing import List, Any
+from typing import Any, List
+
 from pydantic import BaseModel, Field, validator
 
 from text_to_sql.database.db_engine import DBEngine
@@ -33,7 +34,6 @@ class ColumnMetadata(BaseModel):
             return None
         assert isinstance(input_comment, str), "Comment must be a string"
 
-        """The raw input is based on """
         return input_comment
 
 

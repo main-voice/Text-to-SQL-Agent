@@ -2,8 +2,8 @@ import unittest
 
 import mysql.connector
 
-from text_to_sql.database.db_engine import MySQLEngine, DBEngine
 from text_to_sql.database.db_config import DBConfig
+from text_to_sql.database.db_engine import DBEngine, MySQLEngine
 
 
 class TestDatabaseEngine(unittest.TestCase):
@@ -44,6 +44,7 @@ class TestDatabaseEngine(unittest.TestCase):
         """
         with self.assertRaises(TypeError):
             base_engine = DBEngine(DBConfig())
+            base_engine.connect()
 
     def test_connection_error(self):
         """
@@ -52,12 +53,16 @@ class TestDatabaseEngine(unittest.TestCase):
         mysql_engine = MySQLEngine(DBConfig(db_host="localhost", db_user="non_existent_user"))
         with self.assertRaises(mysql.connector.Error):
             test_connection = mysql_engine.connect()
+            print(test_connection)
 
-    def test_close_connection_directly(self):
+    def test_close_connection(self):
         """
         Test close the database connection without creating it
         """
         mysql_engine = MySQLEngine(DBConfig())
+        mysql_engine.disconnect()
+
+        mysql_engine.connect()
         mysql_engine.disconnect()
 
 

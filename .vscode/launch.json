@@ -9,7 +9,7 @@
       "console": "integratedTerminal",
       "cwd": "${workspaceFolder}",
       "env": {
-        "PYTHONPATH": "${workspaceFolder}/text_to_sql"
+        "PYTHONPATH": "${workspaceFolder}"
       },
       "justMyCode": false
     },
