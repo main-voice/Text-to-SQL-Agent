@@ -55,11 +55,14 @@ class TestDatabaseEngine(unittest.TestCase):
             test_connection = mysql_engine.connect()
             print(test_connection)
 
-    def test_close_connection_directly(self):
+    def test_close_connection(self):
         """
         Test close the database connection without creating it
         """
         mysql_engine = MySQLEngine(DBConfig())
+        mysql_engine.disconnect()
+
+        mysql_engine.connect()
         mysql_engine.disconnect()
 
 

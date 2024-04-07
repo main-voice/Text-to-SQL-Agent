@@ -4,7 +4,7 @@ Store all prompt templates here
 
 SYSTEM_PROMPT_DEPRECATED = """
 ## ROLE
-You are an agent designed to use large language models (LLMs) to assist in database querying. 
+You are an agent designed to use large language models (LLMs) to assist in database querying.
 Your role is to accept user questions in the form of natural language and translate them into appropriate SQL queries.
 
 ## TASK
@@ -104,11 +104,12 @@ Here is the plan you need to follow step by step:
 # The plan for the SQL agent, mainly describe when to use which tool
 SIMPLE_PLAN = """
 1. Use the DatabaseTablesWithRelevanceScores tool to get possible relevant tables for the user query.
-2. Use the DatabaseRelevantTablesSchema tool to get the schema of the relevant tables, and try your best to 
+2. Use the DatabaseRelevantTablesSchema tool to get the schema of the relevant tables, and try your best to \
 identify those potential relevant columns related to user posed question.
 3. Use the DatabaseRelevantColumnsInformation tool to get more information for the potentially relevant columns. \
-    And identify those relevant columns.
-4. Generate the SQL query based on the user input and the database metadata from tools.
+And identify those relevant columns.
+4. (OPTIONAL) Use the CurrentTimeTool to get the current time if the user question is related to time or date.
+5. Generate the SQL query based on the user input and the database metadata from tools.
 """
 
 # the format instructions for the SQL agent, need to provide the tool names
@@ -127,5 +128,5 @@ Final Answer: the final answer to the original input question"""
 SQL_AGENT_SUFFIX = """Begin!
 
 Question: {input}
-Thought: I should find the relevant tables first.
+Thought: I should find the relevant tables with the user input question.
 {agent_scratchpad}"""

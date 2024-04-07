@@ -34,5 +34,10 @@
   "flake8.args": ["--config=${workspaceFolder}/.linting/.flake8"],
 
   "isort.path": ["${workspaceFolder}/venv/bin/isort"],
-  "isort.args": ["--settings-path=${workspaceFolder}/.linting/pyproject.toml"]
+  "isort.args": [
+    "--settings-path=${workspaceFolder}/.linting/pyproject.toml"
+  ],
+  "black-formatter.path": [
+    "venv/bin/black"
+  ]
 }
