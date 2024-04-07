@@ -8,6 +8,7 @@ For details: ref to "https://python.langchain.com/docs/modules/agents/tools/"
 # TODO: Add a Chinese to English translation tool
 
 
+from datetime import datetime
 from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
@@ -48,7 +49,7 @@ class RelevantTablesTool(BaseSQLAgentTool, BaseTool):
     name = "DatabaseTablesWithRelevanceScores"
     description = """
         Input: User question.
-        Function: Use this tool to generate a set of tables and their relevance scores 
+        Function: Use this tool to generate a set of tables and their relevance scores \
                   to the user posed question.
         Output: A list of the most relevant tables name.
         """
@@ -165,12 +166,12 @@ class RelevantColumnsInfoTool(BaseSQLAgentTool, BaseTool):
 
     name = "DatabaseRelevantColumnsInformation"
     description = """
-        Input: a mapping list of tables to their columns, separated by semicolons, 
+        Input: a mapping list of tables to their columns, separated by semicolons, \
         where each table is followed by an arrow "->" and its associated columns are listed and separated by commas.
 
         Output: Details for the given columns in the input tables, including sample rows.
         
-        Function: Use this tool to get more information for the potentially relevant columns. Then filter them 
+        Function: Use this tool to get more information for the potentially relevant columns. Then filter them \
         and identify those possible relevant columns based on the user posed question.
         
         Example input: table1 -> column1, column2; table2 -> column3, column4;
@@ -302,6 +303,34 @@ class TablesSchemaTool(BaseSQLAgentTool, BaseTool):
         return tables_schema
 
 
+class CurrentTimeTool(BaseSQLAgentTool, BaseTool):
+    """
+    Return the current time.
+    """
+
+    name = "CurrentTimeTool"
+    description = """
+        Input: an empty string
+        
+        Output: Current date and time.
+        
+        Function: Use this tool first to get the current time if there is time or date related question.
+        """
+
+    def _run(
+        self,
+        run_manager: Optional[CallbackManagerForToolRun] = None,
+        *args: Any,
+        **kwargs: Any,
+    ) -> Any:
+        logger.info(f"The Agent is calling tool: {self.name}.")
+
+        current_time = datetime.now()
+        current_time = current_time.strftime("%Y-%m-%d %H:%M:%S")
+
+        return f"The current date and time is: {current_time}"
+
+
 class SQLAgentToolkits(BaseToolkit):
     """
     Return all available tools that the SQL Agent need.
@@ -331,5 +360,9 @@ class SQLAgentToolkits(BaseToolkit):
         # Get information for given columns tool
         tables_info_tool = RelevantColumnsInfoTool(db_manager=self.db_manager)
         _tools.append(tables_info_tool)
+
+        # Get current time tool
+        current_time_tool = CurrentTimeTool(db_manager=self.db_manager)
+        _tools.append(current_time_tool)
 
         return _tools

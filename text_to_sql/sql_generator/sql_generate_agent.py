@@ -85,7 +85,8 @@ class SQLGeneratorAgent:
             try:
                 response = sql_agent_executor.invoke(_input)
             except Exception as e:
-                logger.error(f"Failed to generate SQL statement using SQL agent executor. Error: {e}")
+                logger.error(f"Failed to generate SQL statement using SQL agent executor. Error: {e}, "
+                             f"error type: {type(e).__name__}")
                 return ""
             if verbose:
                 print(cb)

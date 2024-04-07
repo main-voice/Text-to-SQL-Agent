@@ -5,6 +5,7 @@ from text_to_sql.database.db_engine import MySQLEngine
 from text_to_sql.database.db_metadata_manager import DBMetadataManager
 from text_to_sql.llm import EmbeddingProxy
 from text_to_sql.sql_generator.sql_agent_tools import (
+    CurrentTimeTool,
     RelevantColumnsInfoTool,
     RelevantTablesTool,
     TablesSchemaTool,
@@ -54,3 +55,14 @@ class TestAgentSQLTools(unittest.TestCase):
         test_tables = "jk_user"
         result = tool._run(test_tables)
         print(result)
+
+    def test_get_current_time_tool(self):
+        """
+        test CurrentTimeTool
+        """
+        time_tool = CurrentTimeTool(db_manager=self.db_metadata_manager)
+        try:
+            result = time_tool._run()
+            print(result)
+        except Exception as e:
+            print(e)
