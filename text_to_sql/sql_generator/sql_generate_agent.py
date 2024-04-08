@@ -36,8 +36,11 @@ class SQLGeneratorAgent:
     A LLM Agent that generates SQL using user input and table metadata
     """
 
-    def __init__(self, llm_proxy: LLMProxy, embedding_proxy: EmbeddingProxy):
-        self.db_metadata_manager = DBMetadataManager(MySQLEngine(DBConfig()))
+    def __init__(self, llm_proxy: LLMProxy, embedding_proxy: EmbeddingProxy, db_config=None):
+        if db_config is None:
+            self.db_metadata_manager = DBMetadataManager(MySQLEngine(DBConfig()))
+        else:
+            self.db_metadata_manager = DBMetadataManager(MySQLEngine(db_config))
         self.llm_proxy = llm_proxy
         self.embedding_proxy = embedding_proxy
 
@@ -85,8 +88,10 @@ class SQLGeneratorAgent:
             try:
                 response = sql_agent_executor.invoke(_input)
             except Exception as e:
-                logger.error(f"Failed to generate SQL statement using SQL agent executor. Error: {e}, "
-                             f"error type: {type(e).__name__}")
+                logger.error(
+                    f"Failed to generate SQL statement using SQL agent executor. Error: {e}, "
+                    f"error type: {type(e).__name__}"
+                )
                 return ""
             if verbose:
                 print(cb)
