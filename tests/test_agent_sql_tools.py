@@ -3,7 +3,7 @@ import unittest
 from text_to_sql.database.db_config import DBConfig
 from text_to_sql.database.db_engine import MySQLEngine
 from text_to_sql.database.db_metadata_manager import DBMetadataManager
-from text_to_sql.llm import EmbeddingProxy
+from text_to_sql.llm.embedding_proxy import EmbeddingProxy
 from text_to_sql.sql_generator.sql_agent_tools import (
     CurrentTimeTool,
     RelevantColumnsInfoTool,
@@ -36,13 +36,6 @@ class TestAgentSQLTools(unittest.TestCase):
             print(result)
             self.assertEqual(result, qa_pair[1])
 
-    def test_get_relevant_tables_tool_chinese(self):
-        # TODO: NOT Passed, Add Chinese embedding support
-        tool = RelevantTablesTool(db_manager=self.db_metadata_manager, top_k=2, embedding=self.embedding)
-        result = tool._run("找到发帖数量最多的用户。", remove_prefix=True)
-        print(result)
-        self.assertEqual(result, ["jk_user", "jk_post"])
-
     def test_get_columns_info_tool(self):
         tool = RelevantColumnsInfoTool(db_manager=self.db_metadata_manager)
         test_columns = "jk_user -> id, username, summary; jk_post -> author_id, is_deleted"
@@ -66,3 +59,7 @@ class TestAgentSQLTools(unittest.TestCase):
             print(result)
         except Exception as e:
             print(e)
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -33,3 +33,7 @@ DB_NAME = os.environ.get("DB_NAME", None)
 assert DB_HOST is not None, "Please set DB_HOST variable in .env file under sql_agent/config"
 assert DB_USER is not None, "Please set DB_USER variable in .env file under sql_agent/config"
 assert DB_PASSWORD is not None, "Please set DB_PASSWORD variable in .env file under sql_agent/config"
+
+# You Dao translate service
+YD_APP_ID = os.environ.get("YD_APP_ID", None)
+YD_APP_SECRET_KEY = os.environ.get("YD_APP_SECRET_KEY", None)

@@ -5,9 +5,6 @@ Tools are interfaces that an agent can use to interact with the world.
 For details: ref to "https://python.langchain.com/docs/modules/agents/tools/"
 """
 
-# TODO: Add a Chinese to English translation tool
-
-
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Union
 
@@ -23,6 +20,7 @@ from pydantic import BaseModel, Field
 from text_to_sql.database.db_metadata_manager import DBMetadataManager
 from text_to_sql.database.models import ColumnMetadata, TableMetadata
 from text_to_sql.utils.logger import get_logger
+from text_to_sql.utils.translator import BaseTranslator, LLMTranslator, YoudaoTranslator
 
 logger = get_logger(__name__)
 
@@ -49,9 +47,9 @@ class RelevantTablesTool(BaseSQLAgentTool, BaseTool):
     name = "DatabaseTablesWithRelevanceScores"
     description = """
         Input: User question.
-        Function: Use this tool to generate a set of tables and their relevance scores \
-                  to the user posed question.
         Output: A list of the most relevant tables name.
+        Function: Use this tool to generate a set of tables and their relevance scores \
+        to the user posed question.
         """
     embedding: Union[HuggingFaceEmbeddings, AzureOpenAIEmbeddings] = Field(exclude=True)
     top_k: int = 5  # The number of most similar tables to return, default is 5
@@ -166,16 +164,16 @@ class RelevantColumnsInfoTool(BaseSQLAgentTool, BaseTool):
 
     name = "DatabaseRelevantColumnsInformation"
     description = """
-        Input: a mapping list of tables to their columns, separated by semicolons, \
-        where each table is followed by an arrow "->" and its associated columns are listed and separated by commas.
+    Input: a mapping list of tables to their columns, separated by semicolons, \
+    where each table is followed by an arrow "->" and its associated columns are listed and separated by commas.
 
-        Output: Details for the given columns in the input tables, including sample rows.
-        
-        Function: Use this tool to get more information for the potentially relevant columns. Then filter them \
-        and identify those possible relevant columns based on the user posed question.
-        
-        Example input: table1 -> column1, column2; table2 -> column3, column4;
-        """
+    Output: Details for the given columns in the input tables, including sample rows.
+
+    Function: Use this tool to get more information for the potentially relevant columns. Then filter them \
+    and identify those possible relevant columns based on the user posed question.
+
+    Example input: table1 -> column1, column2; table2 -> column3, column4;
+    """
 
     @property
     def tables_context(self) -> List[TableMetadata]:
@@ -268,14 +266,14 @@ class TablesSchemaTool(BaseSQLAgentTool, BaseTool):
 
     name = "DatabaseRelevantTablesSchema"
     description = """
-        Input: A list of potentially relevant table names
-        Output: Schema of the input tables.
-        
-        Function: Use this tool to get all columns information for relevant tables and \
-        identify those potential columns related to user posed question.
-        
-        Example Input: table1, table2
-        """
+    Input: A list of potentially relevant table names
+    Output: Schema of the input tables.
+
+    Function: Use this tool to get all columns information for relevant tables and \
+    identify those potential columns related to user posed question.
+
+    Example Input: table1, table2
+    """
 
     def _run(
         self,
@@ -310,12 +308,11 @@ class CurrentTimeTool(BaseSQLAgentTool, BaseTool):
 
     name = "CurrentTimeTool"
     description = """
-        Input: an empty string
-        
-        Output: Current date and time.
-        
-        Function: Use this tool first to get the current time if there is time or date related question.
-        """
+    Input: an empty string
+    Output: Current date and time.
+
+    Function: Use this tool first to get the current time if there is time or date related question.
+    """
 
     def _run(
         self,
@@ -329,6 +326,33 @@ class CurrentTimeTool(BaseSQLAgentTool, BaseTool):
         current_time = current_time.strftime("%Y-%m-%d %H:%M:%S")
 
         return f"The current date and time is: {current_time}"
+
+
+class TranslateTool(BaseSQLAgentTool, BaseTool):
+    """
+    Agent tool to translate the given string to english if the given string is chinese.
+    """
+
+    name = "TranslateTool"
+    description = """
+    Input: an chinese string
+    Output: english translation of the given string
+
+    Function: Use this tool to translate the given string to english if the given string is chinese.
+    """
+
+    translator: BaseTranslator = Field(exclude=True)
+
+    def _run(
+        self,
+        text: str,
+        run_manager: Optional[CallbackManagerForToolRun] = None,
+        *args: Any,
+        **kwargs: Any,
+    ) -> Any:
+        logger.info(f"The Agent is calling tool: {self.name}. Input text: {text}.")
+
+        return self.translator.translate(text)
 
 
 class SQLAgentToolkits(BaseToolkit):
@@ -345,7 +369,7 @@ class SQLAgentToolkits(BaseToolkit):
         arbitrary_types_allowed = True
         extra = "allow"
 
-    def get_tools(self) -> List[BaseTool]:
+    def get_tools(self, translate_source="youdao") -> List[BaseTool]:
         # TODO: Add tools choice for the agent
         _tools = []
 
@@ -364,5 +388,14 @@ class SQLAgentToolkits(BaseToolkit):
         # Get current time tool
         current_time_tool = CurrentTimeTool(db_manager=self.db_manager)
         _tools.append(current_time_tool)
+
+        # Add translation tool
+        translator: BaseTranslator = None
+        if translate_source == "llm":
+            translator = LLMTranslator()
+        elif translate_source == "youdao":
+            translator = YoudaoTranslator()
+
+        _tools.append(TranslateTool(db_manager=self.db_manager, translator=translator))
 
         return _tools
