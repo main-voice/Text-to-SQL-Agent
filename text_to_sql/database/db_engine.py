@@ -96,7 +96,7 @@ class MySQLEngine(DBEngine):
                     return [dict(zip(columns, row)) for row in cursor.fetchall()]
                 else:
                     supported_query = ["SELECT"]
-                    raise ValueError(f"Only {supported_query} queries are supported for now!")
+                    raise ValueError(f"Only {supported_query} queries are supported for now! But got {statement}")
                     # self.connection.commit()
                     # return []
         except Exception as e:

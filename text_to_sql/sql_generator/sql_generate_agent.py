@@ -15,7 +15,8 @@ from langchain_community.callbacks import get_openai_callback
 from text_to_sql.database.db_config import DBConfig
 from text_to_sql.database.db_engine import MySQLEngine
 from text_to_sql.database.db_metadata_manager import DBMetadataManager
-from text_to_sql.llm import EmbeddingProxy, LLMProxy
+from text_to_sql.llm.embedding_proxy import EmbeddingProxy
+from text_to_sql.llm.llm_proxy import LLMProxy
 from text_to_sql.sql_generator.sql_agent_tools import SQLAgentToolkits
 from text_to_sql.utils.logger import get_logger
 from text_to_sql.utils.prompt import (

@@ -5,7 +5,8 @@ The entry point for the text-to-SQL chatbot demo.
 
 import gradio as gr
 
-from text_to_sql.llm import EmbeddingProxy, LLMProxy
+from text_to_sql.llm.embedding_proxy import EmbeddingProxy
+from text_to_sql.llm.llm_proxy import LLMProxy
 from text_to_sql.sql_generator.sql_generate_agent import SQLGeneratorAgent
 from text_to_sql.utils.logger import get_logger
 
