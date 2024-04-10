@@ -3,7 +3,8 @@ from typing import Any
 
 from langchain_community.utilities.sql_database import SQLDatabase
 
-from text_to_sql.llm import EmbeddingProxy, LLMProxy
+from text_to_sql.llm.embedding_proxy import EmbeddingProxy
+from text_to_sql.llm.llm_proxy import LLMProxy
 from text_to_sql.sql_generator.sql_generate_agent import SQLGeneratorAgent
 from text_to_sql.utils.logger import get_logger
 
@@ -35,6 +36,12 @@ class TestSQLGeneratorAgent(unittest.TestCase):
 
     def test_sql_agent_with_tools(self):
         question = "Find the user who has the most posts"
+        sql = self.sql_generator_agent.generate_sql_with_agent(question, verbose=True)
+
+        self.validate_sql(sql=sql, expected_result="baokker")
+
+    def test_sql_agent_with_tools_chinese(self):
+        question = "找到发帖数量最多的用户"
         sql = self.sql_generator_agent.generate_sql_with_agent(question, verbose=True)
 
         self.validate_sql(sql=sql, expected_result="baokker")

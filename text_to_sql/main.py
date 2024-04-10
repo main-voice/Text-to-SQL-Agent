@@ -1,13 +1,16 @@
 # Example of using the SQLGeneratorAgent to generate SQL from a question
 
-from text_to_sql.llm import EmbeddingProxy, LLMProxy
-from text_to_sql.sql_generator.sql_generate_agent import SQLGeneratorAgent
+from text_to_sql.config.settings import TOP_K
+from text_to_sql.ui.chatbot import SQLChatbot
 
 if __name__ == "__main__":
-    sql_agent = SQLGeneratorAgent(llm_proxy=LLMProxy(), embedding_proxy=EmbeddingProxy(embedding_source="huggingface"))
+    examples = [
+        "Find the user who has the most posts",
+        "找到发帖数量最多的用户",
+        "Show me the users who login in today",
+    ]
 
-    question = "Find the user who has the most posts"
-    question_cn = "找到发帖数量最多的用户"
-    question_time = "Show me the users who login in today"
-    result = sql_agent.generate_sql_with_agent(question_time, verbose=True)
-    print(result)
+    sql_chatbot = SQLChatbot(examples=examples, top_k=TOP_K)
+
+    demo = sql_chatbot.create_gradio_chatbot()
+    demo.queue().launch(server_name="localhost", server_port=7860)

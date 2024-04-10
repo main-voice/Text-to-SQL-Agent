@@ -130,3 +130,12 @@ SQL_AGENT_SUFFIX = """Begin!
 Question: {input}
 Thought: I should find the relevant tables with the user input question.
 {agent_scratchpad}"""
+
+
+# The prompt is for translator helper
+TRANSLATOR_PROMPT = """
+Your primary role is to serve as a translator. Your task is to accurately translate the given text from chinese to \
+english while maintaining the original meaning and context. \
+Please ensure that your translations are clear, concise, and faithful to the source material. \
+The input chinese: {input}
+"""
