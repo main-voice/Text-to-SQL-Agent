@@ -11,3 +11,4 @@ torch
 numpy
 deprecated
 gradio
+requests

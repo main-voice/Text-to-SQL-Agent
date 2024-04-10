@@ -1,7 +1,7 @@
 import unittest
 from typing import List
 
-from text_to_sql.llm import EmbeddingProxy
+from text_to_sql.llm.embedding_proxy import EmbeddingProxy
 
 
 class TestEmbedding(unittest.TestCase):
@@ -44,3 +44,7 @@ class TestEmbedding(unittest.TestCase):
         result = embedding.embed_query(self.default_str)
         print(result)
         self.assertTrue(isinstance(result, List))
+
+
+if __name__ == "__main__":
+    unittest.main()

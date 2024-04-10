@@ -8,14 +8,14 @@ from typing import Any
 from deprecated import deprecated
 from langchain.agents import AgentExecutor, ZeroShotAgent
 from langchain.chains.llm import LLMChain
-
 # pylint: disable=no-name-in-module
 from langchain_community.callbacks import get_openai_callback
 
 from text_to_sql.database.db_config import DBConfig
 from text_to_sql.database.db_engine import MySQLEngine
 from text_to_sql.database.db_metadata_manager import DBMetadataManager
-from text_to_sql.llm import EmbeddingProxy, LLMProxy
+from text_to_sql.llm.embedding_proxy import EmbeddingProxy
+from text_to_sql.llm.llm_proxy import LLMProxy
 from text_to_sql.sql_generator.sql_agent_tools import SQLAgentToolkits
 from text_to_sql.utils.logger import get_logger
 from text_to_sql.utils.prompt import (
@@ -80,6 +80,7 @@ class SQLGeneratorAgent:
         sql_agent_executor = self.create_sql_agent(verbose=verbose)
         sql_agent_executor.return_intermediate_steps = True
 
+        user_query = self.preprocess_input(user_query)
         _input = {
             "input": user_query,
         }
@@ -108,6 +109,36 @@ class SQLGeneratorAgent:
             generated_sql = self.format_sql(generated_sql)
 
         return generated_sql
+
+    @classmethod
+    def preprocess_input(cls, user_query: str) -> str:
+        """
+        Pre-process the user input before generating SQL statement
+        Mainly for translate the user input to English
+        """
+
+        # judge the language of the user input
+        def is_contain_chinese(user_query: str) -> bool:
+            """
+            Judge whether the user input contains Chinese characters
+            """
+            for ch in user_query:
+                if "\u4e00" <= ch <= "\u9fff":
+                    return True
+
+            return False
+
+        if is_contain_chinese(user_query):
+            # translate the user input to English
+            logger.info("Input is chinese, we are translating user input to English...")
+            from text_to_sql.utils.translator import YoudaoTranslator
+
+            translator = YoudaoTranslator()
+            user_query = translator.translate(user_query)
+            return user_query
+
+        # don't forget here
+        return user_query
 
     @deprecated(version="0.1.0", reason="This function only use simple prompt, use generate_sql_with_agent instead")
     def generate_sql(self, user_query: str, single_line_format: bool = False) -> str:
