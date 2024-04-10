@@ -8,6 +8,7 @@ from typing import Any
 from deprecated import deprecated
 from langchain.agents import AgentExecutor, ZeroShotAgent
 from langchain.chains.llm import LLMChain
+
 # pylint: disable=no-name-in-module
 from langchain_community.callbacks import get_openai_callback
 
@@ -36,13 +37,14 @@ class SQLGeneratorAgent:
     A LLM Agent that generates SQL using user input and table metadata
     """
 
-    def __init__(self, llm_proxy: LLMProxy, embedding_proxy: EmbeddingProxy, db_config=None):
+    def __init__(self, llm_proxy: LLMProxy, embedding_proxy: EmbeddingProxy, db_config=None, top_k=5):
         if db_config is None:
             self.db_metadata_manager = DBMetadataManager(MySQLEngine(DBConfig()))
         else:
             self.db_metadata_manager = DBMetadataManager(MySQLEngine(db_config))
         self.llm_proxy = llm_proxy
         self.embedding_proxy = embedding_proxy
+        self.top_k: int = top_k
 
     def create_sql_agent(self, verbose=True) -> AgentExecutor:
         """
@@ -53,7 +55,9 @@ class SQLGeneratorAgent:
         # prepare embedding model, the embedding type is from Azure or Huggingface
         embedding = self.embedding_proxy.get_embedding()
 
-        agent_tools = SQLAgentToolkits(db_manager=self.db_metadata_manager, embedding=embedding).get_tools()
+        agent_tools = SQLAgentToolkits(
+            db_manager=self.db_metadata_manager, embedding=embedding, top_k=self.top_k
+        ).get_tools()
         tools_name = [tool.name for tool in agent_tools]
 
         logger.info(f"The agent tools are: {tools_name}")

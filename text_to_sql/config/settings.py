@@ -37,3 +37,6 @@ assert DB_PASSWORD is not None, "Please set DB_PASSWORD variable in .env file un
 # You Dao translate service
 YD_APP_ID = os.environ.get("YD_APP_ID", None)
 YD_APP_SECRET_KEY = os.environ.get("YD_APP_SECRET_KEY", None)
+
+# TOP K relevant tables
+TOP_K = int(os.environ.get("TOP_K", 5))

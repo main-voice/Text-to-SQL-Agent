@@ -18,8 +18,10 @@ class SQLChatbot:
     A chatbot which wrapper sql agent and gradio chatbot
     """
 
-    def __init__(self, db_config=None, title=None, description=None, examples=None):
-        self.agent = SQLGeneratorAgent(llm_proxy=LLMProxy(), embedding_proxy=EmbeddingProxy(), db_config=db_config)
+    def __init__(self, db_config=None, title=None, description=None, examples=None, top_k=5):
+        self.agent = SQLGeneratorAgent(
+            llm_proxy=LLMProxy(), embedding_proxy=EmbeddingProxy(), db_config=db_config, top_k=top_k
+        )
         self.bot_title = title or "Text-to-SQL Chatbot Demo"
         self.bot_description = (
             description
@@ -44,5 +46,5 @@ class SQLChatbot:
     def chatbot_response(self, message, history):
 
         response = self.agent.generate_sql_with_agent(message)
-        logger.info(f"Chatbot response: {response}")
+        logger.info(f"\nChatbot response: {response}")
         return response

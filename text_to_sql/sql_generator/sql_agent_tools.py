@@ -365,6 +365,7 @@ class SQLAgentToolkits(BaseToolkit):
 
     db_manager: DBMetadataManager = Field(exclude=True)
     embedding: Union[HuggingFaceEmbeddings, AzureOpenAIEmbeddings] = Field(exclude=True)
+    top_k: int = 5
 
     class Config(BaseToolkit.Config):
         """Config for Pydantic BaseModel"""
@@ -377,7 +378,9 @@ class SQLAgentToolkits(BaseToolkit):
         _tools = []
 
         # Find relevant tables tool
-        relevant_tables_tool = RelevantTablesTool(db_manager=self.db_manager, embedding=self.embedding)
+        relevant_tables_tool = RelevantTablesTool(
+            db_manager=self.db_manager, embedding=self.embedding, top_k=self.top_k
+        )
         _tools.append(relevant_tables_tool)
 
         # Get schema for given tables
