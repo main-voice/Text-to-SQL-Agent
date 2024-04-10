@@ -22,7 +22,7 @@ from text_to_sql.utils.logger import get_logger
 from text_to_sql.utils.prompt import (
     DB_INTRO,
     FORMAT_INSTRUCTIONS,
-    SIMPLE_PLAN,
+    PLAN_WITH_VALIDATION,
     SQL_AGENT_PREFIX,
     SQL_AGENT_SUFFIX,
     SYSTEM_CONSTRAINTS,
@@ -63,7 +63,7 @@ class SQLGeneratorAgent:
         logger.info(f"The agent tools are: {tools_name}")
 
         # create LLM chain
-        prefix = SQL_AGENT_PREFIX.format(plan=SIMPLE_PLAN)
+        prefix = SQL_AGENT_PREFIX.format(plan=PLAN_WITH_VALIDATION)
         prompt = ZeroShotAgent.create_prompt(
             tools=agent_tools, prefix=prefix, suffix=SQL_AGENT_SUFFIX, format_instructions=FORMAT_INSTRUCTIONS
         )
