@@ -20,7 +20,7 @@ from pydantic import BaseModel, Field
 from text_to_sql.database.db_metadata_manager import DBMetadataManager
 from text_to_sql.database.models import ColumnMetadata, TableMetadata
 from text_to_sql.utils.logger import get_logger
-from text_to_sql.utils.translator import BaseTranslator, LLMTranslator, YoudaoTranslator
+from text_to_sql.utils.translator import BaseTranslator
 
 logger = get_logger(__name__)
 
@@ -195,12 +195,14 @@ class RelevantColumnsInfoTool(BaseSQLAgentTool, BaseTool):
         logger.info(f"The Agent is calling tool: {self.name}. Input table and columns name: {table_with_columns}.")
 
         table_column_items_list = table_with_columns.split(";")
+        # remove those empty items
+        table_column_items_list = [item.strip() for item in table_column_items_list if item.strip()]
         table_with_columns_dict: Dict[str, List[str]] = {}
 
         for item in table_column_items_list:
             if "->" not in item:
                 return (
-                    "Bad input format. Please refer to the Example input: "
+                    f"Bad input format. the item is {item}. Please refer to the Example input: "
                     "table1 -> column1, column2; table2 -> column3, column4;"
                 )
             _table, _columns = item.split("->")
@@ -316,6 +318,7 @@ class CurrentTimeTool(BaseSQLAgentTool, BaseTool):
 
     def _run(
         self,
+        input_string: str = "",
         run_manager: Optional[CallbackManagerForToolRun] = None,
         *args: Any,
         **kwargs: Any,
@@ -390,12 +393,12 @@ class SQLAgentToolkits(BaseToolkit):
         _tools.append(current_time_tool)
 
         # Add translation tool
-        translator: BaseTranslator = None
-        if translate_source == "llm":
-            translator = LLMTranslator()
-        elif translate_source == "youdao":
-            translator = YoudaoTranslator()
-
-        _tools.append(TranslateTool(db_manager=self.db_manager, translator=translator))
+        # translator: BaseTranslator = None
+        # if translate_source == "llm":
+        #     translator = LLMTranslator()
+        # elif translate_source == "youdao":
+        #     translator = YoudaoTranslator()
+        #
+        # _tools.append(TranslateTool(db_manager=self.db_manager, translator=translator))
 
         return _tools

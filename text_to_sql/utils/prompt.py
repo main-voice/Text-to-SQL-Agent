@@ -103,8 +103,6 @@ Here is the plan you need to follow step by step:
 
 # The plan for the SQL agent, mainly describe when to use which tool
 SIMPLE_PLAN = """
-0. Use the TranslateTool tool to translate the user question to English if the question is not in English. You should \
-replace the original question with the translated one in the following steps.
 1. Use the DatabaseTablesWithRelevanceScores tool to get possible relevant tables for the user query.
 2. Use the DatabaseRelevantTablesSchema tool to get the schema of the relevant tables, and try your best to \
 identify those potential relevant columns related to user posed question.
