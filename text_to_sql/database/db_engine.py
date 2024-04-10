@@ -89,8 +89,8 @@ class MySQLEngine(DBEngine):
 
         try:
             with self.connection.cursor() as cursor:
-                cursor.execute(statement, params)
                 if statement.lower().startswith("select"):
+                    cursor.execute(statement, params)
                     logger.info(f"Executing SELECT query '{statement}'")
                     columns = [col[0] for col in cursor.description]
                     return [dict(zip(columns, row)) for row in cursor.fetchall()]

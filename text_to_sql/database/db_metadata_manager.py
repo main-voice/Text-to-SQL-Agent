@@ -2,6 +2,9 @@
 This file is used to obtain the metadata of the database based on SqlAlchemy package
 """
 
+import re
+from typing import List
+
 from sqlalchemy import MetaData, create_engine, inspect
 from sqlalchemy.sql.ddl import CreateTable
 
@@ -75,11 +78,11 @@ class DBMetadataManager:
             if column_meta["name"] == column_name:
                 return self.get_column_metadata(column_meta)
 
-    def get_available_table_names(self):
+    def get_available_table_names(self) -> List[str]:
         """
         return the list of table names in the database
         """
-        return self._metadata.tables.keys()
+        return list(self._metadata.tables.keys())
 
     def get_table_schema(self, table_name: str) -> str:
         """
@@ -88,7 +91,10 @@ class DBMetadataManager:
         table_meta = self._metadata.tables[table_name]
         _engine = create_engine(self.db_engine.get_connection_url())
         table_ddl = str(CreateTable(table_meta).compile(_engine))
-
+        table_ddl = table_ddl.replace("\n", " ").replace("\t", " ")
+        # remove multiple spaces
+        table_ddl = re.sub(r" +", " ", table_ddl)
+        table_ddl = table_ddl.strip()
         return table_ddl
 
     def get_tables_schema(self, table_names: list) -> dict:
