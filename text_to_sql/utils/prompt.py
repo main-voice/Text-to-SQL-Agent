@@ -128,7 +128,7 @@ And identify those relevant columns.
 Otherwise, rewrite the SQL query and check it again. Repeat this step 3 times at most.
 
 # Other points you need to remember:
-1. If the sql is wrong after calling CheckQueryCorrectness tool, rewrite the SQL query and check it again.
+1. If the sql is wrong after calling ValidateQueryCorrectness tool, rewrite the SQL query and check it again.
 2. You should always execute the SQL query by calling ValidateQueryCorrectness tool to make sure the results are correct
 
 """
@@ -159,4 +159,24 @@ Your primary role is to serve as a translator. Your task is to accurately transl
 english while maintaining the original meaning and context. \
 Please ensure that your translations are clear, concise, and faithful to the source material. \
 The input chinese: {input}
+"""
+
+# For parsing error from llm agent
+ERROR_PARSING_MESSAGE = """
+ERROR: Parsing error, you should only use tools or return the final answer. You are a ReAct agent, \
+you should not return any other format.
+Use the following format:
+
+Question: the input question you must answer
+Thought: you should always think about what to do
+Action: the action to take, one of the tools
+Action Input: the input to the action
+Observation: the result of the action
+... (this Thought/Action/Action Input/Observation can repeat N times)
+Thought: I now know the final answer
+Final Answer: the final answer to the original input question
+
+If there is a consistent parsing error, please return "I don't know" as your final answer.
+If you know the final answer and do not need to use any tools, directly return the final answer in this format:
+Final Answer: <your final answer>.
 """

@@ -3,7 +3,7 @@ The main SQLGeneratorAgent class is responsible for generating SQL statements us
 """
 
 import re
-from typing import Any
+from typing import Any, List, Tuple
 
 from deprecated import deprecated
 from langchain.agents import AgentExecutor, ZeroShotAgent
@@ -11,6 +11,7 @@ from langchain.chains.llm import LLMChain
 
 # pylint: disable=no-name-in-module
 from langchain_community.callbacks import get_openai_callback
+from langchain_core.agents import AgentAction
 
 from text_to_sql.database.db_engine import MySQLEngine
 from text_to_sql.database.db_metadata_manager import DBMetadataManager
@@ -18,9 +19,11 @@ from text_to_sql.database.models import DBConfig
 from text_to_sql.llm.embedding_proxy import EmbeddingProxy
 from text_to_sql.llm.llm_proxy import LLMProxy
 from text_to_sql.sql_generator.sql_agent_tools import SQLAgentToolkits
+from text_to_sql.utils import is_contain_chinese
 from text_to_sql.utils.logger import get_logger
 from text_to_sql.utils.prompt import (
     DB_INTRO,
+    ERROR_PARSING_MESSAGE,
     FORMAT_INSTRUCTIONS,
     PLAN_WITH_VALIDATION,
     SQL_AGENT_PREFIX,
@@ -37,6 +40,8 @@ class SQLGeneratorAgent:
     A LLM Agent that generates SQL using user input and table metadata
     """
 
+    max_input_size: int = 1024
+
     def __init__(self, llm_proxy: LLMProxy, embedding_proxy: EmbeddingProxy, db_config=None, top_k=5):
         if db_config is None:
             self.db_metadata_manager = DBMetadataManager(MySQLEngine(DBConfig()))
@@ -46,7 +51,7 @@ class SQLGeneratorAgent:
         self.embedding_proxy = embedding_proxy
         self.top_k: int = top_k
 
-    def create_sql_agent(self, verbose=True) -> AgentExecutor:
+    def create_sql_agent(self, early_stopping_method: str = "generate", verbose=True) -> AgentExecutor:
         """
         Create a SQL agent executor using our custom SQL agent tools and LLM
         """
@@ -71,7 +76,9 @@ class SQLGeneratorAgent:
 
         # create sql agent executor
         sql_agent = ZeroShotAgent(llm_chain=llm_chain, allowed_tools=tools_name)
-        sql_agent_executor = AgentExecutor.from_agent_and_tools(agent=sql_agent, tools=agent_tools)
+        sql_agent_executor = AgentExecutor.from_agent_and_tools(
+            agent=sql_agent, tools=agent_tools, early_stopping_method=early_stopping_method
+        )
 
         logger.info("Finished creating SQL agent executor.")
         return sql_agent_executor
@@ -83,6 +90,7 @@ class SQLGeneratorAgent:
         # create an agent executor
         sql_agent_executor = self.create_sql_agent(verbose=verbose)
         sql_agent_executor.return_intermediate_steps = True
+        sql_agent_executor.handle_parsing_errors = ERROR_PARSING_MESSAGE
 
         user_query = self.preprocess_input(user_query)
         _input = {
@@ -99,7 +107,7 @@ class SQLGeneratorAgent:
                 )
                 return ""
             if verbose:
-                print(cb)
+                logger.info(f"The callback from openai is:\n{cb}\n")
 
         if not response:
             logger.error("Failed to generate SQL statement using SQL agent executor.")
@@ -109,6 +117,10 @@ class SQLGeneratorAgent:
         if "```sql" in response["output"]:
             generated_sql = self.extract_sql_from_llm_response(response["output"])
             generated_sql = self.remove_markdown_format(generated_sql)
+        else:
+            logger.info("Not found ```sql in LLM output, trying to find result from intermediate steps")
+            generated_sql = self.extract_sql_from_intermediate_steps(response["intermediate_steps"])
+
         if single_line_format:
             generated_sql = self.format_sql(generated_sql)
 
@@ -118,30 +130,33 @@ class SQLGeneratorAgent:
     def preprocess_input(cls, user_query: str) -> str:
         """
         Pre-process the user input before generating SQL statement
-        Mainly for translate the user input to English
+        1. avoid too long strings
+        2. translate the user input to English
         """
 
-        # judge the language of the user input
-        def is_contain_chinese(user_query: str) -> bool:
-            """
-            Judge whether the user input contains Chinese characters
-            """
-            for ch in user_query:
-                if "\u4e00" <= ch <= "\u9fff":
-                    return True
-
-            return False
+        if len(user_query) > cls.max_input_size:
+            logger.warning(f"The user input is too long, trim it down to a maximum of {cls.max_input_size} characters.")
+            user_query = user_query[: cls.max_input_size]
 
         if is_contain_chinese(user_query):
             # translate the user input to English
-            logger.info("Input is chinese, we are translating user input to English...")
-            from text_to_sql.utils.translator import YoudaoTranslator
+            try:
+                logger.info("Translating user input to English using Youdao...")
+                from text_to_sql.utils.translator import YoudaoTranslator
 
-            translator = YoudaoTranslator()
-            user_query = translator.translate(user_query)
+                translator = YoudaoTranslator()
+                user_query = translator.translate(user_query)
+            except Exception as e:
+                logger.error(f"ERROR when translating input {user_query} to English using Youdao translate: {e}")
+                logger.info("Translating user input to English using LLM...")
+                from text_to_sql.utils.translator import LLMTranslator
+
+                translator = LLMTranslator()
+                user_query = translator.translate(user_query)
+
             return user_query
 
-        # don't forget here
+        # don't forget here when the input is normal english statement.
         return user_query
 
     @deprecated(version="0.1.0", reason="This function only use simple prompt, use generate_sql_with_agent instead")
@@ -206,30 +221,70 @@ class SQLGeneratorAgent:
         ```
         Need to remove the markdown format to get the SQL statement
         """
-        return sql.strip("```").strip("sql").strip().lower()
+        sql = sql.strip("```").strip("sql").strip().lower()
+        # sometimes LLM may response ```sql and ````
+        if "`" in sql:
+            sql = sql.replace("`", "")
+        return sql
 
     @classmethod
-    def extract_sql_from_llm_response(cls, sql) -> str:
+    def extract_sql_from_llm_response(cls, response) -> str:
         """
         The LLM response contains the SQL statement in the following format:
         ```sql
         select xxxx from xxxx where xxxx
         ```
+
+        Params:
+            response: The response from LLM
+        Return:
+            The SQL statement wrapper by ```sql and ``` tags
         """
         expected_start_format = "```sql"
         expected_end_format = "```"
         expected_pattern = rf"({expected_start_format}.*?{expected_end_format})"
 
         # Extract the SQL statement from the response
-        extracted_sql = re.findall(expected_pattern, sql, re.DOTALL)
+        extracted_sqls: list = re.findall(expected_pattern, response, re.DOTALL)
 
-        if not extracted_sql:
+        if not extracted_sqls:
             logger.error("Failed to extract SQL statement from LLM response.")
             return ""
 
-        if len(extracted_sql) > 1:
+        if len(extracted_sqls) > 1:
             logger.warning("Multiple SQL statements found in LLM response. Using the first one.")
 
-        extracted_sql = extracted_sql[0]
+        extracted_sql: str = extracted_sqls[0]
 
         return extracted_sql
+
+    @classmethod
+    def extract_sql_from_intermediate_steps(cls, intermediate_steps: List[Tuple[AgentAction, str]]) -> str:
+        """Extract the SQL statement from the agent intermediate steps"""
+        sql = ""
+
+        # trying to find sql from the input of ValidateSQLCorrectness tool
+        for step in intermediate_steps:
+            action = step[0]
+            if isinstance(action, AgentAction) and action.tool == "ValidateSQLCorrectness":
+                # Input: an SQL wrapper in ```sql and ``` tags.
+                tool_input = action.tool_input
+                sql = cls.extract_sql_from_llm_response(tool_input)
+                sql = cls.remove_markdown_format(sql)
+
+        # if we don't find sql in the ValidateSQLCorrectness tool, we will try to find sql in previous step
+        if not sql:
+            logger.info("No valid SQL in ValidateSQLCorrectness tool input, trying to find in the previous steps.")
+            for step in intermediate_steps:
+                action = step[0]
+                # the log format is
+                # Thought: xxx
+                # Action: xxx
+                # Action Input: xxx
+                thought = action.log.split("Action:")[0]
+                if "```sql" in thought:
+                    sql = cls.extract_sql_from_llm_response(thought)
+                    sql = cls.remove_markdown_format(sql)
+                    if not sql.lower().strip().startswith("select"):
+                        sql = ""
+        return sql

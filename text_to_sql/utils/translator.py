@@ -100,7 +100,12 @@ class YoudaoTranslator(BaseTranslator):
     def translate(self, to_be_translate: str, *args, **kwargs) -> str:
         params = self.youdao_get_url_encoded_params(to_be_translate=to_be_translate)
         header = {"Content-Type": "application/x-www-form-urlencoded"}
-        response = requests.get(self.yd_base_url, headers=header, params=params, timeout=7).text
+        try:
+            response = requests.get(self.yd_base_url, headers=header, params=params, timeout=7).text
+        except Exception as e:
+            logger.error(f"Error while translating text: {to_be_translate}")
+            raise e
+
         json_data = json.loads(response)
         trans_text = json_data["translation"][0]
         return trans_text
