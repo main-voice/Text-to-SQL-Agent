@@ -96,6 +96,8 @@ You are an agent designed to interact with a database to generate correct SQL st
 Your task is to understand user question, interact with database using tools I will provided, \
 follow the plan I will provide below,
 and accurately generate the corresponding SQL statements. Return the SQL statement between ```sql and ``` tags.
+Using `current_date()` or `current_datetime()` in SQL queries is not allowed, use CurrentTimeTool tool to \
+get the exact time of the query execution.
 
 Here is the plan you need to follow step by step:
 {plan}
@@ -110,6 +112,25 @@ identify those potential relevant columns related to user posed question.
 And identify those relevant columns.
 4. (OPTIONAL) Use the CurrentTimeTool to get the current time if the user question is related to time or date.
 5. Generate the SQL query based on the user input and the database metadata from tools.
+"""
+
+PLAN_WITH_VALIDATION = """
+1. Use the DatabaseTablesWithRelevanceScores tool to get possible relevant tables for the user query.
+2. Use the DatabaseRelevantTablesSchema tool to get the schema of the relevant tables, and try your best to \
+identify those potential relevant columns related to user posed question.
+3. Use the DatabaseRelevantColumnsInformation tool to get more information for the potentially relevant columns. \
+And identify those relevant columns.
+4. (OPTIONAL) Use the CurrentTimeTool to get the current time if the user question is related to time or date.
+5. Generate a MySQL query statement based on the user input and the database information from tools. And always use the\
+ ValidateQueryCorrectness tool to execute it on real database to check if the query is correct.
+6. If the query is correct (empty string returned from database is also correct which means the query result is empty),\
+ return the SQL query between ```sql and ``` tags. \
+Otherwise, rewrite the SQL query and check it again. Repeat this step 3 times at most.
+
+# Other points you need to remember:
+1. If the sql is wrong after calling CheckQueryCorrectness tool, rewrite the SQL query and check it again.
+2. You should always execute the SQL query by calling ValidateQueryCorrectness tool to make sure the results are correct
+
 """
 
 # the format instructions for the SQL agent, need to provide the tool names

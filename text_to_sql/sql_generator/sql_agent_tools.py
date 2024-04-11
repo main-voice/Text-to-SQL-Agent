@@ -17,6 +17,7 @@ from langchain_community.embeddings.huggingface import HuggingFaceEmbeddings
 from langchain_openai import AzureOpenAIEmbeddings
 from pydantic import BaseModel, Field
 
+from text_to_sql.database.db_engine import DBEngine
 from text_to_sql.database.db_metadata_manager import DBMetadataManager
 from text_to_sql.database.models import ColumnMetadata, TableMetadata
 from text_to_sql.utils.logger import get_logger
@@ -31,6 +32,14 @@ class BaseSQLAgentTool(BaseModel):
     """
 
     db_manager: DBMetadataManager = Field(exclude=True)
+
+    @property
+    def db_context(self) -> List[TableMetadata]:
+        return self.db_manager.get_db_metadata().tables
+
+    @property
+    def db_engine(self) -> DBEngine:
+        return self.db_manager.db_engine
 
     class Config(BaseTool.Config):
         """Config for Pydantic BaseModel"""
@@ -54,10 +63,6 @@ class RelevantTablesTool(BaseSQLAgentTool, BaseTool):
     embedding: Union[HuggingFaceEmbeddings, AzureOpenAIEmbeddings] = Field(exclude=True)
     top_k: int = 5  # The number of most similar tables to return, default is 5
 
-    @property
-    def tables_context(self) -> List[TableMetadata]:
-        return self.db_manager.get_db_metadata().tables
-
     def generate_embedding(self, text: str) -> List[float]:
         """
         Generate embedding for the given text.
@@ -79,7 +84,6 @@ class RelevantTablesTool(BaseSQLAgentTool, BaseTool):
     def _run(
         self,
         question: str,
-        remove_prefix: bool = False,
         run_manager: Optional[CallbackManagerForToolRun] = None,
     ) -> List[str]:
         """
@@ -94,21 +98,14 @@ class RelevantTablesTool(BaseSQLAgentTool, BaseTool):
         """
         logger.info(f"The Agent is calling tool: {self.name}.")
 
-        if not self.tables_context:
-            raise ValueError("No table metadata found in the database. Please check the database connection.")
-
         question_embedding = self.generate_embedding(question)
 
         # Contain all tables and columns string representation
         tables_cols_str = []
 
         # Convert table metadata to a string
-        for table in self.tables_context:
-            # if remove prefix ...
-            if remove_prefix:
-                table_name = table.table_name.replace("jk_", "", 1)
-            else:
-                table_name = table.table_name
+        for table in self.db_context:
+            table_name = table.table_name
 
             columns_str = ""
             for column in table.columns:
@@ -147,13 +144,6 @@ class RelevantTablesTool(BaseSQLAgentTool, BaseTool):
             {table_similarity_score_str} for the question: {question}."
         )
 
-        # Now we have the table names and their relevance scores, return the most relevant tables
-        # recover the table names (add jk_ prefix again)
-        if remove_prefix:
-            tables_name = df["table_name"].values.tolist()
-            restored_tables_name = [f"jk_{table_name}" for table_name in tables_name if table_name != "oss_auth"]
-            return restored_tables_name
-
         return df["table_name"].values.tolist()
 
 
@@ -174,10 +164,6 @@ class RelevantColumnsInfoTool(BaseSQLAgentTool, BaseTool):
 
     Example input: table1 -> column1, column2; table2 -> column3, column4;
     """
-
-    @property
-    def tables_context(self) -> List[TableMetadata]:
-        return self.db_manager.get_db_metadata().tables
 
     def _run(
         self,
@@ -210,9 +196,6 @@ class RelevantColumnsInfoTool(BaseSQLAgentTool, BaseTool):
             columns = [_column.strip() for _column in _columns.split(",")]
             table_with_columns_dict[table_name] = columns
 
-        if not self.tables_context:
-            raise ValueError("No table metadata found in the database. Please check the database connection.")
-
         all_available_table_names = self.db_manager.get_available_table_names()
         if not all_available_table_names:
             raise ValueError("No table names found in the database. Please check the database connection.")
@@ -229,7 +212,7 @@ class RelevantColumnsInfoTool(BaseSQLAgentTool, BaseTool):
         # tables_info & column_info are string representation for the tables and columns in database
         tables_columns_info: str = ""
 
-        for table in self.tables_context:
+        for table in self.db_context:
             if table.table_name not in potential_relevant_table_names:
                 # irrelevant table, skip
                 continue
@@ -240,10 +223,12 @@ class RelevantColumnsInfoTool(BaseSQLAgentTool, BaseTool):
                 found_column: bool = False
                 column_info: str = ""
 
+                # try to find the column in database
                 column: ColumnMetadata = self.db_manager.get_column_metadata_from_name(
                     table_name=table.table_name, column_name=potential_relevant_column
                 )
-                if column.column_name:
+
+                if column and column.column_name:
                     # The column is found in the database
                     found_column = True
                     column_info += f"column name: {column.column_name}, comment: {column.comment}.\n"
@@ -254,7 +239,9 @@ class RelevantColumnsInfoTool(BaseSQLAgentTool, BaseTool):
                     column_info = "Table: " + table.table_name + ", " + column_info
 
                 if not found_column:
-                    column_info += f"Table: {table.table_name}, column {column.column_name} not found in database.\n"
+                    column_info += (
+                        f"Table: {table.table_name}, column {str(potential_relevant_column)} not found in database.\n"
+                    )
 
                 tables_columns_info += column_info
 
@@ -268,7 +255,7 @@ class TablesSchemaTool(BaseSQLAgentTool, BaseTool):
 
     name = "DatabaseRelevantTablesSchema"
     description = """
-    Input: A list of potentially relevant table names
+    Input: A list of potentially relevant table names separated by English comma.
     Output: Schema of the input tables.
 
     Function: Use this tool to get all columns information for relevant tables and \
@@ -287,6 +274,12 @@ class TablesSchemaTool(BaseSQLAgentTool, BaseTool):
 
         logger.info(f"The Agent is calling tool: {self.name}. Input table names: {table_names}.")
 
+        if not isinstance(table_names, str):
+            # test case depends on the return string
+            return (
+                "Bad input, please refer to examples which should be a list of table names separated by English comma."
+            )
+
         table_names = table_names.split(",")
         table_names = [table_name.strip() for table_name in table_names]
 
@@ -294,8 +287,8 @@ class TablesSchemaTool(BaseSQLAgentTool, BaseTool):
         if not all_available_table_names:
             raise ValueError("No table names found in the database. Please check the database connection.")
 
-        if not table_names:
-            missing_tables = set(all_available_table_names) - set(table_names)
+        if table_names:
+            missing_tables = set(table_names) - set(all_available_table_names)
             if missing_tables:
                 raise ValueError(f"Table names: {missing_tables} not found in the database. Please check the input.")
 
@@ -358,6 +351,40 @@ class TranslateTool(BaseSQLAgentTool, BaseTool):
         return self.translator.translate(text)
 
 
+class ValidateSQLCorrectness(BaseSQLAgentTool, BaseTool):
+    """
+    Agent tool to validate the generated SQL correctness
+    """
+
+    name = "ValidateSQLCorrectness"
+    description = """
+    Input: an SQL wrapper in ```sql and ``` tags.
+    Output: result from database engine or any error message raised during executing the sql
+    Function: Use this tool to execute the SQL query
+    """
+
+    def _run(
+        self,
+        sql_query: str,
+        run_manager: Optional[CallbackManagerForToolRun] = None,
+        *args: Any,
+        **kwargs: Any,
+    ) -> str:
+        sql_query = sql_query.strip().replace(r"\_", "_")
+        if "```sql" in sql_query:
+            sql_query = sql_query.replace("```sql", "").replace("```", "").strip()
+
+        logger.info(f"The Agent is calling tool: {self.name}. Input SQL query: {sql_query}.")
+
+        try:
+            result = self.db_manager.db_engine.execute(statement=sql_query)
+        except Exception as e:
+            logger.error(f"ERROR raised during executing the SQL query: {sql_query}. Error message: {str(e)}")
+            return "ERROR" + str(e)
+
+        return str(result).strip()
+
+
 class SQLAgentToolkits(BaseToolkit):
     """
     Return all available tools that the SQL Agent need.
@@ -373,7 +400,7 @@ class SQLAgentToolkits(BaseToolkit):
         arbitrary_types_allowed = True
         extra = "allow"
 
-    def get_tools(self, translate_source="youdao") -> List[BaseTool]:
+    def get_tools(self) -> List[BaseTool]:
         # TODO: Add tools choice for the agent
         _tools = []
 
@@ -403,5 +430,9 @@ class SQLAgentToolkits(BaseToolkit):
         #     translator = YoudaoTranslator()
         #
         # _tools.append(TranslateTool(db_manager=self.db_manager, translator=translator))
+
+        # Validate SQL correctness tool
+        validate_sql_tool = ValidateSQLCorrectness(db_manager=self.db_manager)
+        _tools.append(validate_sql_tool)
 
         return _tools
