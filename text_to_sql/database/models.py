@@ -6,7 +6,20 @@ from typing import Any, List
 
 from pydantic import BaseModel, Field, validator
 
-from text_to_sql.database.db_engine import DBEngine
+from text_to_sql.config.settings import DB_HOST, DB_NAME, DB_PASSWORD, DB_USER
+
+
+class DBConfig(BaseModel):
+    """
+    Store the configuration info of the database
+    Use the info specified in the .env file by default
+    """
+
+    db_host: str = DB_HOST
+    db_name: str = DB_NAME
+    db_password: str = Field(default=DB_PASSWORD, exclude=True)
+    db_user: str = DB_USER
+    db_type: str = Field(default="mysql")
 
 
 class ColumnMetadata(BaseModel):
@@ -15,7 +28,6 @@ class ColumnMetadata(BaseModel):
     """
 
     column_name: str = Field(alias="name")
-    is_nullable: bool = Field(alias="nullable")
     column_default: str | None = Field(alias="default")
     comment: str | None
     type: Any = "str"
@@ -44,7 +56,7 @@ class TableMetadata(BaseModel):
 
     table_name: str
     columns: List[ColumnMetadata]
-    description: str | None
+    description: str | None = None
 
 
 class DatabaseMetadata(BaseModel):
@@ -52,13 +64,5 @@ class DatabaseMetadata(BaseModel):
     The class to store the metadata of a database
     """
 
-    db_engine: DBEngine
     tables: List[TableMetadata]
-    description: str | None
-
-    class Config:
-        """
-        pydantic config class, to allow custom class DBEngine to be used
-        """
-
-        arbitrary_types_allowed = True
+    description: str | None = None

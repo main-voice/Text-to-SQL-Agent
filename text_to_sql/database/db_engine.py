@@ -9,7 +9,7 @@ import mysql.connector
 
 from text_to_sql.utils.logger import get_logger
 
-from .db_config import DBConfig
+from .models import DBConfig
 
 logger = get_logger(__name__)
 

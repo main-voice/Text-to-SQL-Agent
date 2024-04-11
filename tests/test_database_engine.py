@@ -2,8 +2,8 @@ import unittest
 
 import mysql.connector
 
-from text_to_sql.database.db_config import DBConfig
 from text_to_sql.database.db_engine import DBEngine, MySQLEngine
+from text_to_sql.database.models import DBConfig
 
 
 class TestDatabaseEngine(unittest.TestCase):

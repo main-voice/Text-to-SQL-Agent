@@ -48,7 +48,7 @@ class DBMetadataManager:
             table_metadata = self.get_table_metadata(table_name)
             tables_meta.append(table_metadata)
 
-        return DatabaseMetadata(db_engine=self.db_engine, tables=tables_meta)
+        return DatabaseMetadata(tables=tables_meta)
 
     def get_table_metadata(self, table_name: str) -> TableMetadata:
         """
