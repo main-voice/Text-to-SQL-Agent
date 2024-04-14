@@ -11,7 +11,7 @@ from langchain_openai import AzureOpenAIEmbeddings
 from pydantic import BaseModel, validator
 from sentence_transformers import SentenceTransformer
 
-from text_to_sql.config.settings import AZURE_API_KEY, AZURE_ENDPOINT
+from text_to_sql.config.settings import AZURE_API_KEY, AZURE_API_VERSION, AZURE_ENDPOINT
 from text_to_sql.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -45,8 +45,6 @@ class AzureEmbedding(BaseEmbedding, BaseModel):
     # So here we use @validator("model_name") instead of @classmethod @validator("model_name")
     @validator("model_name")
     def check_model_name(cls, model_name: str) -> str:  # pylint: disable=no-self-argument
-        x = type(cls._available_models)
-        print(x)
         if model_name not in cls._available_models:
             raise ValueError(f"Model {model_name} is not available. Available models are: {cls._available_models}")
         return model_name
@@ -72,7 +70,7 @@ class AzureEmbedding(BaseEmbedding, BaseModel):
             deployment=deploy_name,
             model=self.model_name,
             openai_api_key=AZURE_API_KEY,
-            openai_api_version="2023-08-01-preview",
+            openai_api_version=AZURE_API_VERSION,
         )
         self.embedding = _azure_embedding
         return self.embedding

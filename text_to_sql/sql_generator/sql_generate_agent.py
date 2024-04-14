@@ -17,7 +17,7 @@ from text_to_sql.database.db_engine import MySQLEngine
 from text_to_sql.database.db_metadata_manager import DBMetadataManager
 from text_to_sql.database.models import DBConfig
 from text_to_sql.llm.embedding_proxy import EmbeddingProxy
-from text_to_sql.llm.llm_proxy import LLMProxy
+from text_to_sql.llm.llm_proxy import AzureLLMConfig, BaseLLMConfig, LLMProxy
 from text_to_sql.sql_generator.sql_agent_tools import SQLAgentToolkits
 from text_to_sql.utils import is_contain_chinese
 from text_to_sql.utils.logger import get_logger
@@ -40,15 +40,32 @@ class SQLGeneratorAgent:
     A LLM Agent that generates SQL using user input and table metadata
     """
 
-    max_input_size: int = 1024
+    max_input_size: int = 200
 
-    def __init__(self, llm_proxy: LLMProxy, embedding_proxy: EmbeddingProxy, db_config=None, top_k=5):
+    def __init__(
+        self, llm_config: BaseLLMConfig = None, embedding_proxy: EmbeddingProxy = None, db_config=None, top_k=5
+    ):
+        # set database metadata manager
         if db_config is None:
             self.db_metadata_manager = DBMetadataManager(MySQLEngine(DBConfig()))
         else:
             self.db_metadata_manager = DBMetadataManager(MySQLEngine(db_config))
-        self.llm_proxy = llm_proxy
-        self.embedding_proxy = embedding_proxy
+
+        if llm_config is None:
+            # If llm_config is None, we will use the default LLM which is Azure LLM
+            self.llm_config = AzureLLMConfig()
+        else:
+            self.llm_config = llm_config
+
+        # set LLM proxy
+        self.llm_proxy = LLMProxy(config=self.llm_config)
+
+        # set embedding proxy
+        if embedding_proxy is None:
+            self.embedding_proxy = EmbeddingProxy()
+        else:
+            self.embedding_proxy = embedding_proxy
+
         self.top_k: int = top_k
 
     def create_sql_agent(self, early_stopping_method: str = "generate", verbose=True) -> AgentExecutor:
@@ -76,9 +93,13 @@ class SQLGeneratorAgent:
 
         # create sql agent executor
         sql_agent = ZeroShotAgent(llm_chain=llm_chain, allowed_tools=tools_name)
-        sql_agent_executor = AgentExecutor.from_agent_and_tools(
-            agent=sql_agent, tools=agent_tools, early_stopping_method=early_stopping_method
-        )
+        if self.llm_config.llm_source == "azure":
+            sql_agent_executor = AgentExecutor.from_agent_and_tools(
+                agent=sql_agent, tools=agent_tools, early_stopping_method=early_stopping_method
+            )
+        else:
+            # for perplexity llm, it doesn't support custom stopping words
+            sql_agent_executor = AgentExecutor.from_agent_and_tools(agent=sql_agent, tools=agent_tools)
 
         logger.info("Finished creating SQL agent executor.")
         return sql_agent_executor

@@ -3,8 +3,7 @@ from typing import Any
 
 from langchain_community.utilities.sql_database import SQLDatabase
 
-from text_to_sql.llm.embedding_proxy import EmbeddingProxy
-from text_to_sql.llm.llm_proxy import LLMProxy
+from text_to_sql.llm.llm_proxy import PerplexityLLMConfig
 from text_to_sql.sql_generator.sql_generate_agent import SQLGeneratorAgent
 from text_to_sql.utils.logger import get_logger
 
@@ -13,7 +12,7 @@ logger = get_logger(__name__)
 
 class TestSQLGeneratorAgent(unittest.TestCase):
     def setUp(self):
-        self.sql_generator_agent = SQLGeneratorAgent(llm_proxy=LLMProxy(), embedding_proxy=EmbeddingProxy())
+        self.sql_generator_agent = SQLGeneratorAgent()
 
     def test_langchain_agent(self):
         pass
@@ -34,16 +33,24 @@ class TestSQLGeneratorAgent(unittest.TestCase):
         print(f"SQL: {_sql}")
         self.validate_sql(sql=_sql, expected_result="baokker")
 
-    def test_sql_agent_with_tools(self):
+    def test_sql_agent(self):
         question = "Find the user who has the most posts"
         sql = self.sql_generator_agent.generate_sql_with_agent(question, verbose=True)
 
         self.validate_sql(sql=sql, expected_result="baokker")
 
-    def test_sql_agent_with_tools_chinese(self):
+    def test_sql_agent_chinese(self):
         question = "找到发帖数量最多的用户"
         sql = self.sql_generator_agent.generate_sql_with_agent(question, verbose=True)
 
+        self.validate_sql(sql=sql, expected_result="baokker")
+
+    def test_sql_agent_per_llm(self):
+        # custom stop word is not supported yet
+        pass
+        question = "Find the user who has the most posts"
+        self.sql_generator_agent = SQLGeneratorAgent(llm_config=PerplexityLLMConfig())
+        sql = self.sql_generator_agent.generate_sql_with_agent(question, verbose=True)
         self.validate_sql(sql=sql, expected_result="baokker")
 
     def validate_sql(self, sql: str, expected_result: Any):

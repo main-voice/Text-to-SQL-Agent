@@ -13,7 +13,7 @@ from langchain.prompts import PromptTemplate
 from langchain_community.callbacks.manager import get_openai_callback
 
 from text_to_sql.config.settings import YD_APP_ID, YD_APP_SECRET_KEY
-from text_to_sql.llm.llm_proxy import LLMProxy
+from text_to_sql.llm.llm_proxy import AzureLLMConfig, LLMProxy
 from text_to_sql.utils.logger import get_logger
 from text_to_sql.utils.prompt import TRANSLATOR_PROMPT
 
@@ -46,7 +46,8 @@ class LLMTranslator(BaseTranslator):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.translate_source = "llm"
-        self.llm_proxy = LLMProxy()
+        # for llm translation, we only use Azure LLM for now.
+        self.llm_proxy = LLMProxy(AzureLLMConfig())
 
     def translate(self, to_be_translate: str, *args, **kwargs) -> str:
         llm = self.llm_proxy.llm
