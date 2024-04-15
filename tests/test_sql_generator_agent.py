@@ -46,11 +46,13 @@ class TestSQLGeneratorAgent(unittest.TestCase):
         self.validate_sql(sql=sql, expected_result="baokker")
 
     def test_sql_agent_per_llm(self):
-        # custom stop word is not supported yet
-        pass
+        """
+        The perplexity llm can't use custom stopping words, means we can't use the tools and ZeroShotAgent,
+        so we can only use the SQLGeneratorAgent to generate SQL directly
+        """
         question = "Find the user who has the most posts"
-        self.sql_generator_agent = SQLGeneratorAgent(llm_config=PerplexityLLMConfig())
-        sql = self.sql_generator_agent.generate_sql_with_agent(question, verbose=True)
+        simple_sql_agent = SQLGeneratorAgent(llm_config=PerplexityLLMConfig())
+        sql = simple_sql_agent.generate_sql(user_query=question, verbose=True)
         self.validate_sql(sql=sql, expected_result="baokker")
 
     def validate_sql(self, sql: str, expected_result: Any):

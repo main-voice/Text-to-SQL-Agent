@@ -181,12 +181,13 @@ class SQLGeneratorAgent:
         return user_query
 
     @deprecated(version="0.1.0", reason="This function only use simple prompt, use generate_sql_with_agent instead")
-    def generate_sql(self, user_query: str, single_line_format: bool = False) -> str:
+    def generate_sql(self, user_query: str, single_line_format: bool = False, verbose=True) -> str:
         """
         Generate SQL statement using user input and table metadata
 
         :param user_query: str - The user's query, in natural language
         :param single_line_format: bool - Whether to return the SQL query as a single line or not
+        :param verbose: bool - Whether to log the token usage or not
         :return: str - The generated SQL query
         """
 
@@ -200,7 +201,7 @@ class SQLGeneratorAgent:
             metadata=tables_info_json, user_input=user_query, system_constraints=SYSTEM_CONSTRAINTS, db_intro=DB_INTRO
         )
 
-        response = self.llm_proxy.get_response_from_llm(question=question).content
+        response = self.llm_proxy.get_response_from_llm(question=question, verbose=verbose).content
 
         if not response.startswith("```sql"):
             logger.warning("Generated SQL statement is not in the expected format, trying to extract SQL...")
