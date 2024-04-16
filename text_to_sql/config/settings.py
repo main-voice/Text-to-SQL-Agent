@@ -48,3 +48,8 @@ YD_APP_SECRET_KEY = os.environ.get("YD_APP_SECRET_KEY", None)
 
 # TOP K relevant tables
 TOP_K = int(os.environ.get("TOP_K", 5))
+
+# Langchain Smith
+LANGCHAIN_TRACING_V2 = os.environ.get("LANGCHAIN_TRACING_V2", "False") == "True"
+LANGCHAIN_API_KEY = os.environ.get("LANGCHAIN_API_KEY", None)
+LANGCHAIN_PROJECT = os.environ.get("LANGCHAIN_PROJECT", None)
