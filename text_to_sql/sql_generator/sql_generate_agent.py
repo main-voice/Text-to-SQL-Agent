@@ -17,7 +17,7 @@ from text_to_sql.database.db_engine import MySQLEngine
 from text_to_sql.database.db_metadata_manager import DBMetadataManager
 from text_to_sql.database.models import DBConfig
 from text_to_sql.llm.embedding_proxy import EmbeddingProxy
-from text_to_sql.llm.llm_proxy import LLMProxy
+from text_to_sql.llm.llm_proxy import AzureLLMConfig, BaseLLMConfig, LLMProxy
 from text_to_sql.sql_generator.sql_agent_tools import SQLAgentToolkits
 from text_to_sql.utils import is_contain_chinese
 from text_to_sql.utils.logger import get_logger
@@ -40,15 +40,32 @@ class SQLGeneratorAgent:
     A LLM Agent that generates SQL using user input and table metadata
     """
 
-    max_input_size: int = 1024
+    max_input_size: int = 200
 
-    def __init__(self, llm_proxy: LLMProxy, embedding_proxy: EmbeddingProxy, db_config=None, top_k=5):
+    def __init__(
+        self, llm_config: BaseLLMConfig = None, embedding_proxy: EmbeddingProxy = None, db_config=None, top_k=5
+    ):
+        # set database metadata manager
         if db_config is None:
             self.db_metadata_manager = DBMetadataManager(MySQLEngine(DBConfig()))
         else:
             self.db_metadata_manager = DBMetadataManager(MySQLEngine(db_config))
-        self.llm_proxy = llm_proxy
-        self.embedding_proxy = embedding_proxy
+
+        if llm_config is None:
+            # If llm_config is None, we will use the default LLM which is Azure LLM
+            self.llm_config = AzureLLMConfig()
+        else:
+            self.llm_config = llm_config
+
+        # set LLM proxy
+        self.llm_proxy = LLMProxy(config=self.llm_config)
+
+        # set embedding proxy
+        if embedding_proxy is None:
+            self.embedding_proxy = EmbeddingProxy()
+        else:
+            self.embedding_proxy = embedding_proxy
+
         self.top_k: int = top_k
 
     def create_sql_agent(self, early_stopping_method: str = "generate", verbose=True) -> AgentExecutor:
@@ -76,9 +93,13 @@ class SQLGeneratorAgent:
 
         # create sql agent executor
         sql_agent = ZeroShotAgent(llm_chain=llm_chain, allowed_tools=tools_name)
-        sql_agent_executor = AgentExecutor.from_agent_and_tools(
-            agent=sql_agent, tools=agent_tools, early_stopping_method=early_stopping_method
-        )
+        if self.llm_config.llm_source == "azure":
+            sql_agent_executor = AgentExecutor.from_agent_and_tools(
+                agent=sql_agent, tools=agent_tools, early_stopping_method=early_stopping_method
+            )
+        else:
+            # for perplexity llm, it doesn't support custom stopping words
+            sql_agent_executor = AgentExecutor.from_agent_and_tools(agent=sql_agent, tools=agent_tools)
 
         logger.info("Finished creating SQL agent executor.")
         return sql_agent_executor
@@ -160,12 +181,13 @@ class SQLGeneratorAgent:
         return user_query
 
     @deprecated(version="0.1.0", reason="This function only use simple prompt, use generate_sql_with_agent instead")
-    def generate_sql(self, user_query: str, single_line_format: bool = False) -> str:
+    def generate_sql(self, user_query: str, single_line_format: bool = False, verbose=True) -> str:
         """
         Generate SQL statement using user input and table metadata
 
         :param user_query: str - The user's query, in natural language
         :param single_line_format: bool - Whether to return the SQL query as a single line or not
+        :param verbose: bool - Whether to log the token usage or not
         :return: str - The generated SQL query
         """
 
@@ -179,7 +201,7 @@ class SQLGeneratorAgent:
             metadata=tables_info_json, user_input=user_query, system_constraints=SYSTEM_CONSTRAINTS, db_intro=DB_INTRO
         )
 
-        response = self.llm_proxy.get_response_from_llm(question=question).content
+        response = self.llm_proxy.get_response_from_llm(question=question, verbose=verbose).content
 
         if not response.startswith("```sql"):
             logger.warning("Generated SQL statement is not in the expected format, trying to extract SQL...")

@@ -15,10 +15,18 @@ DEBUG = os.environ.get("DEBUG", "False") == "True"
 LOGGING_LEVEL = logging.DEBUG if DEBUG else logging.INFO
 
 # LLM Config
+# AZURE
 AZURE_ENDPOINT = os.environ.get("AZURE_ENDPOINT", None)
 AZURE_API_KEY = os.environ.get("AZURE_API_KEY", None)
+AZURE_API_VERSION = os.environ.get("AZURE_API_VERSION", None)
+
 # if using gpt4 model
 AZURE_GPT_4 = os.environ.get("AZURE_GPT_4", "False") == "True"
+
+# PER API
+PER_API_KEY = os.environ.get("PER_API_KEY", None)
+PER_ENDPOINT = os.environ.get("PER_ENDPOINT", None)
+
 
 # Embedding model
 AZURE_EMBEDDING_MODEL = os.environ.get("AZURE_EMBEDDING_MODEL", None)
