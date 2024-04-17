@@ -163,3 +163,8 @@ junit.xml
 
 # models
 text_to_sql/llm/model_assets/
+
+# docker data
+data/
+# docs
+docs/
