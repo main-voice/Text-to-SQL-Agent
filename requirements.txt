@@ -4,6 +4,7 @@ langchain
 langchain-openai
 python-dotenv
 mysql-connector-python
+psycopg2
 SQLAlchemy
 pandas
 sentence-transformers
