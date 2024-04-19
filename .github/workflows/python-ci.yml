@@ -20,6 +20,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install virtualenv
+          virtualenv venv
           source venv/bin/activate
           echo "Virtual environment created."
       - name: Cache Python dependencies
