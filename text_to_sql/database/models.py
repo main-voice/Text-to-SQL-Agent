@@ -6,21 +6,6 @@ from typing import Any, List
 
 from pydantic import BaseModel, Field, validator
 
-from text_to_sql.config.settings import DB_HOST, DB_NAME, DB_PASSWORD, DB_USER
-
-
-class DBConfig(BaseModel):
-    """
-    Store the configuration info of the database
-    Use the info specified in the .env file by default
-    """
-
-    db_host: str = DB_HOST
-    db_name: str = DB_NAME
-    db_password: str = Field(default=DB_PASSWORD, exclude=True)
-    db_user: str = DB_USER
-    db_type: str = Field(default="mysql")
-
 
 class ColumnMetadata(BaseModel):
     """
@@ -29,10 +14,10 @@ class ColumnMetadata(BaseModel):
 
     column_name: str = Field(alias="name")
     column_default: str | None = Field(alias="default")
-    comment: str | None
-    type: Any = "str"
+    comment: str | None = Field(alias="column_description")
+    data_type: Any = Field(alias="type")
 
-    @validator("type")
+    @validator("data_type")
     @classmethod
     def check_type(cls, input_type):
         # A demo input type is 'type': VARCHAR(charset='utf8mb4', collation='utf8mb4_unicode_ci', length=64)',

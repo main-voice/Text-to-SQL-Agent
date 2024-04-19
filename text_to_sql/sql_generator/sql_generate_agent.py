@@ -13,9 +13,9 @@ from langchain.chains.llm import LLMChain
 from langchain_community.callbacks import get_openai_callback
 from langchain_core.agents import AgentAction
 
+from text_to_sql.database.db_config import DBConfig, MySQLConfig
 from text_to_sql.database.db_engine import MySQLEngine
 from text_to_sql.database.db_metadata_manager import DBMetadataManager
-from text_to_sql.database.models import DBConfig
 from text_to_sql.llm.embedding_proxy import EmbeddingProxy
 from text_to_sql.llm.llm_proxy import AzureLLMConfig, BaseLLMConfig, LLMProxy
 from text_to_sql.sql_generator.sql_agent_tools import SQLAgentToolkits
@@ -43,11 +43,15 @@ class SQLGeneratorAgent:
     max_input_size: int = 200
 
     def __init__(
-        self, llm_config: BaseLLMConfig = None, embedding_proxy: EmbeddingProxy = None, db_config=None, top_k=5
+        self,
+        llm_config: BaseLLMConfig = None,
+        embedding_proxy: EmbeddingProxy = None,
+        db_config: DBConfig = None,
+        top_k=5,
     ):
         # set database metadata manager
         if db_config is None:
-            self.db_metadata_manager = DBMetadataManager(MySQLEngine(DBConfig()))
+            self.db_metadata_manager = DBMetadataManager(MySQLEngine(MySQLConfig()))
         else:
             self.db_metadata_manager = DBMetadataManager(MySQLEngine(db_config))
 
