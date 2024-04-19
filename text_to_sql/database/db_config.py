@@ -18,6 +18,7 @@ class DBConfig(BaseSettings):
     db_name: str = None
     db_port: int = None
     db_type: str = None
+    db_driver: str = None
 
     class Config:
         """Config for pydantic class"""
@@ -33,6 +34,7 @@ class MySQLConfig(DBConfig):
 
     db_type: str = Field(default="mysql", const=True)
     db_port: int = Field(default=3306)
+    db_driver: str = Field(default="mysqlconnector", const=True)
 
     class Config:
         """Config for pydantic class"""
@@ -48,6 +50,7 @@ class PostgreSQLConfig(DBConfig):
 
     db_type: str = Field(default="postgresql", const=True)
     db_port: int = Field(default=5432)
+    db_driver: str = Field(default="psycopg2", const=True)
 
     class Config:
         """Config for pydantic class"""

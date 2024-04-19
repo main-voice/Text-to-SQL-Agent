@@ -14,10 +14,10 @@ class ColumnMetadata(BaseModel):
 
     column_name: str = Field(alias="name")
     column_default: str | None = Field(alias="default")
-    comment: str | None
-    type: Any = "str"
+    comment: str | None = Field(alias="column_description")
+    data_type: Any = Field(alias="type")
 
-    @validator("type")
+    @validator("data_type")
     @classmethod
     def check_type(cls, input_type):
         # A demo input type is 'type': VARCHAR(charset='utf8mb4', collation='utf8mb4_unicode_ci', length=64)',

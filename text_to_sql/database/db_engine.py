@@ -52,15 +52,10 @@ class DBEngine(ABC):
         """Return a list of available databases in the connected database"""
         pass
 
+    @abstractmethod
     def get_connection_url(self) -> str:
-        """Return the connection URL for the database engine, can be used for SQLAlchemy connection string"""
-        url = (
-            f"{self.db_config.db_type}://{self.db_config.db_user}:{self.db_config.db_password}@{self.db_config.db_host}"
-        )
-        if self.db_config.db_port:
-            url += f":{self.db_config.db_port}"
-        url += f"/{self.db_config.db_name}"
-        return url
+        """Return the template of connection URL SQLAlchemy needed for the database engine"""
+        return "{dialect}+{driver}://{username}:{password}@{host}:{port}/{database}"
 
     @abstractmethod
     def disconnect(self):
@@ -91,6 +86,18 @@ class MySQLEngine(DBEngine):
         with self.connection.cursor() as cursor:
             cursor.execute("SHOW DATABASES;")
             return [row[0] for row in cursor.fetchall()]
+
+    def get_connection_url(self) -> str:
+        mysql_template = super().get_connection_url()
+        return mysql_template.format(
+            dialect=self.db_config.db_type,
+            driver=self.db_config.db_driver,
+            username=self.db_config.db_user,
+            password=self.db_config.db_password,
+            host=self.db_config.db_host,
+            port=self.db_config.db_port,
+            database=self.db_config.db_name,
+        )
 
     def connect(self, db_name: str = None):
         """Connect to the MySQL database using the provided configuration
@@ -164,6 +171,18 @@ class PostgreSQLEngine(DBEngine):
 
     def is_connected(self) -> bool:
         return self.connection is not None and self.connection.closed == 0
+
+    def get_connection_url(self) -> str:
+        postgres_template = super().get_connection_url()
+        return postgres_template.format(
+            dialect=self.db_config.db_type,
+            driver=self.db_config.db_driver,
+            username=self.db_config.db_user,
+            password=self.db_config.db_password,
+            host=self.db_config.db_host,
+            port=self.db_config.db_port,
+            database=self.db_config.db_name,
+        )
 
     def available_databases(self) -> List[str]:
         self.connect()
