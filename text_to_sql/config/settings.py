@@ -56,3 +56,6 @@ TOP_K = int(os.environ.get("TOP_K", 5))
 LANGCHAIN_TRACING_V2 = os.environ.get("LANGCHAIN_TRACING_V2", "False") == "True"
 LANGCHAIN_API_KEY = os.environ.get("LANGCHAIN_API_KEY", None)
 LANGCHAIN_PROJECT = os.environ.get("LANGCHAIN_PROJECT", None)
+
+SENTRY_DSN = os.environ.get("SENTRY_DSN", None)
+ENVIRONMENT = os.environ.get("ENVIRONMENT", "development")
