@@ -22,7 +22,7 @@ jobs:
           path: ~/.cache/pip
           key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
           restore-keys: |
-            ${{ runner.os }}-pip- 
+            ${{ runner.os }}-pip-
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
@@ -46,8 +46,14 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pip-
       - name: Lint with pylint
-        run: pylint --rcfile=.linting/.pylintrc **/*.py
+        run: |
+          pip install pytest pylint flake8
+          pip show pylint
+          pylint --rcfile=.linting/.pylintrc **/*.py
       - name: Lint with flake8
-        run: flake8 --config=.linting/.flake8 **/*.py
+        run: |
+          pip install pytest pylint flake8
+          pip show flake8
+          flake8 --config=.linting/.flake8 **/*.py
       - name: Run tests
         run: pytest tests/test_db_config.py
