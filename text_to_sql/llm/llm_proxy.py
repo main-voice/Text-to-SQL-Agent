@@ -46,9 +46,9 @@ class PerplexityLLMConfig(BaseLLMConfig):
     """
 
     llm_source: str = "perplexity"
-    model: Literal["sonar-small-chat", "sonar-medium-chat", "mistral-7b-instruct", "mistral-8x7b-instruct"] = (
-        "sonar-small-chat"
-    )
+    model: Literal[
+        "sonar-small-chat", "sonar-medium-chat", "mistral-7b-instruct", "mistral-8x7b-instruct"
+    ] = "sonar-small-chat"
 
 
 class AzureLLM:
@@ -110,7 +110,6 @@ class LLMProxy:
     """
 
     def __init__(self, config: AzureLLMConfig | PerplexityLLMConfig) -> None:
-
         if config.llm_source == "azure":
             self.llm = AzureLLM(config).llm
         elif config.llm_source == "perplexity":

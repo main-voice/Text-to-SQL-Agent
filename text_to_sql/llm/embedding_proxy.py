@@ -44,6 +44,7 @@ class AzureEmbedding(BaseEmbedding, BaseModel):
     # If we declare the function as a classmethod, @classmethod must be placed before @validator, or it will not work
     # So here we use @validator("model_name") instead of @classmethod @validator("model_name")
     @validator("model_name")
+    @classmethod
     def check_model_name(cls, model_name: str) -> str:  # pylint: disable=no-self-argument
         if model_name not in cls._available_models:
             raise ValueError(f"Model {model_name} is not available. Available models are: {cls._available_models}")
@@ -88,6 +89,7 @@ class HuggingFaceEmbedding(BaseEmbedding, BaseModel):
     ]
 
     @validator("model_name")
+    @classmethod
     def check_model_name(cls, model_name: str) -> str:  # pylint: disable=no-self-argument
         if model_name not in cls._available_models:
             raise ValueError(f"Model {model_name} is not available. Available models are: {cls._available_models}")

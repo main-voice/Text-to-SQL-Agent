@@ -42,8 +42,7 @@ class SQLChatbot:
 
         return demo
 
-    def chatbot_response(self, message, history):
-
+    def chatbot_response(self, message, history):  # pylint: disable=unused-argument
         response = self.agent.generate_sql_with_agent(message)
         logger.info(f"\nChatbot response: {response}")
         return response

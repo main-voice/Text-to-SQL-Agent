@@ -5,6 +5,7 @@ The main SQLGeneratorAgent class is responsible for generating SQL statements us
 import re
 from typing import Any, List, Tuple
 
+import openai
 from deprecated import deprecated
 from langchain.agents import AgentExecutor, ZeroShotAgent
 from langchain.chains.llm import LLMChain
@@ -12,6 +13,7 @@ from langchain.chains.llm import LLMChain
 # pylint: disable=no-name-in-module
 from langchain_community.callbacks import get_openai_callback
 from langchain_core.agents import AgentAction
+from sqlalchemy.exc import SQLAlchemyError
 
 from text_to_sql.database.db_config import DBConfig, MySQLConfig
 from text_to_sql.database.db_engine import MySQLEngine
@@ -31,6 +33,7 @@ from text_to_sql.utils.prompt import (
     SYSTEM_CONSTRAINTS,
     SYSTEM_PROMPT_DEPRECATED,
 )
+from text_to_sql.utils.translator import LLMTranslator, YoudaoTranslator
 
 logger = get_logger(__name__)
 
@@ -125,12 +128,21 @@ class SQLGeneratorAgent:
         with get_openai_callback() as cb:
             try:
                 response = sql_agent_executor.invoke(_input)
-            except Exception as e:
+            except openai.AuthenticationError as e:
+                logger.error(f"OpenAI API authentication error: {e}")
+                return ""
+            except openai.RateLimitError as e:
+                logger.error(f"OpenAI API rate limit error: {e}")
+                return f"OpenAI API rate limit error: {e}"
+            except SQLAlchemyError as e:
+                logger.error(f"SQLAlchemy error: {e}")
+                return f"SQLAlchemy error: {e}"
+            except Exception as e:  # pylint: disable=broad-except
                 logger.error(
                     f"Failed to generate SQL statement using SQL agent executor. Error: {e}, "
                     f"error type: {type(e).__name__}"
                 )
-                return ""
+                return None
             if verbose:
                 logger.info(f"The callback from openai is:\n{cb}\n")
 
@@ -167,14 +179,12 @@ class SQLGeneratorAgent:
             # translate the user input to English
             try:
                 logger.info("Translating user input to English using Youdao...")
-                from text_to_sql.utils.translator import YoudaoTranslator
 
                 translator = YoudaoTranslator()
                 user_query = translator.translate(user_query)
-            except Exception as e:
+            except Exception as e:  # pylint: disable=broad-except
                 logger.error(f"ERROR when translating input {user_query} to English using Youdao translate: {e}")
                 logger.info("Translating user input to English using LLM...")
-                from text_to_sql.utils.translator import LLMTranslator
 
                 translator = LLMTranslator()
                 user_query = translator.translate(user_query)

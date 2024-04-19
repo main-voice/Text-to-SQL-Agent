@@ -1,6 +1,6 @@
 import unittest
 
-from text_to_sql.database.db_config import DBConfig
+from text_to_sql.database.db_config import MySQLConfig
 from text_to_sql.database.db_engine import MySQLEngine
 from text_to_sql.database.db_metadata_manager import DBMetadataManager
 from text_to_sql.llm.embedding_proxy import EmbeddingProxy
@@ -22,7 +22,7 @@ class TestAgentSQLTools(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         # set up the info for all test cases, only execute once
-        cls.db_metadata_manager = DBMetadataManager(MySQLEngine(DBConfig()))
+        cls.db_metadata_manager = DBMetadataManager(MySQLEngine(MySQLConfig()))
         cls.embedding = EmbeddingProxy(embedding_source="huggingface").get_embedding()
 
     def test_relevant_tables_tool(self):
@@ -34,7 +34,7 @@ class TestAgentSQLTools(unittest.TestCase):
         for qa_pair in qa_pairs:
             # Only select expected number of tables
             tool.top_k = len(qa_pair[1])
-            result = tool._run(qa_pair[0])
+            result = tool._run(question=qa_pair[0])
             print(result)
             self.assertEqual(set(result), set(qa_pair[1]))
 

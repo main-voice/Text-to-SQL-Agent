@@ -6,7 +6,7 @@ import hashlib
 import json
 import time
 from abc import ABC, abstractmethod
-from typing import Literal
+from typing import Any, Literal
 
 import requests
 from langchain.prompts import PromptTemplate
@@ -23,7 +23,7 @@ logger = get_logger(__name__)
 class BaseTranslator(ABC):
     """Abstract class for translator"""
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any):
         self.translate_source: Literal["llm", "youdao"] = "youdao"
 
     @abstractmethod
@@ -54,7 +54,7 @@ class LLMTranslator(BaseTranslator):
         prompt_template = PromptTemplate.from_template(TRANSLATOR_PROMPT)
         prompt = prompt_template.format(input=to_be_translate)
 
-        if "verbose" in kwargs.keys():
+        if kwargs.get("verbose"):
             if kwargs["verbose"]:
                 with get_openai_callback() as cb:
                     _resp = llm.invoke(input=prompt)

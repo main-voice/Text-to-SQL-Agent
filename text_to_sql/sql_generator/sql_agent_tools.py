@@ -85,7 +85,9 @@ class RelevantTablesTool(BaseSQLAgentTool, BaseTool):
         self,
         question: str,
         run_manager: Optional[CallbackManagerForToolRun] = None,
-    ) -> List[str]:
+        *args: Any,
+        **kwargs: Any,
+    ) -> List[str]:  # pylint: disable=arguments-differ
         """
         Find all possible relevant tables and columns in the database based on user question and db metadata.
 
@@ -168,7 +170,9 @@ class RelevantColumnsInfoTool(BaseSQLAgentTool, BaseTool):
     def _run(
         self,
         table_with_columns: str,
-        run_manager: Optional[CallbackManagerForToolRun] = None,
+        run_manager: Optional[CallbackManagerForToolRun] = None,  # pylint: disable=unused-argument
+        *args: Any,
+        **kwargs: Any,
     ) -> Any:
         """
         Return all information for the possible relevant columns.
@@ -267,11 +271,10 @@ class TablesSchemaTool(BaseSQLAgentTool, BaseTool):
     def _run(
         self,
         table_names: str,
-        run_manager: Optional[CallbackManagerForToolRun] = None,
+        run_manager: Optional[CallbackManagerForToolRun] = None,  # pylint: disable=unused-argument
         *args: Any,
         **kwargs: Any,
     ) -> Any:
-
         logger.info(f"The Agent is calling tool: {self.name}. Input table names: {table_names}.")
 
         if not isinstance(table_names, str):
@@ -303,7 +306,7 @@ class CurrentTimeTool(BaseSQLAgentTool, BaseTool):
 
     name = "CurrentTimeTool"
     description = """
-    Input: an empty string
+    Input: there is no input for the tool.
     Output: Current date and time.
 
     Function: Use this tool first to get the current time if there is time or date related question.
@@ -311,8 +314,8 @@ class CurrentTimeTool(BaseSQLAgentTool, BaseTool):
 
     def _run(
         self,
-        input_string: str = "",
-        run_manager: Optional[CallbackManagerForToolRun] = None,
+        # input_string: Optional[str] = None,
+        run_manager: Optional[CallbackManagerForToolRun] = None,  # pylint: disable=unused-argument
         *args: Any,
         **kwargs: Any,
     ) -> Any:
@@ -342,7 +345,7 @@ class TranslateTool(BaseSQLAgentTool, BaseTool):
     def _run(
         self,
         text: str,
-        run_manager: Optional[CallbackManagerForToolRun] = None,
+        run_manager: Optional[CallbackManagerForToolRun] = None,  # pylint: disable=unused-argument
         *args: Any,
         **kwargs: Any,
     ) -> Any:
@@ -366,7 +369,7 @@ class ValidateSQLCorrectness(BaseSQLAgentTool, BaseTool):
     def _run(
         self,
         sql_query: str,
-        run_manager: Optional[CallbackManagerForToolRun] = None,
+        run_manager: Optional[CallbackManagerForToolRun] = None,  # pylint: disable=unused-argument
         *args: Any,
         **kwargs: Any,
     ) -> str:

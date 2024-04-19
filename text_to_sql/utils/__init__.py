@@ -1,3 +1,6 @@
+"""Some utility functions for text to SQL."""
+
+
 # judge the language of the user input
 def is_contain_chinese(user_query: str) -> bool:
     """
