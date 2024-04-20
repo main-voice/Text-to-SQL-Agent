@@ -2,53 +2,17 @@
 Proxy class to supported LLM client
 """
 
-from typing import Any, Literal, Optional
+from typing import Any
 
 # pylint: disable=no-name-in-module
 from langchain_community.callbacks import get_openai_callback
 from langchain_openai import AzureChatOpenAI, ChatOpenAI
-from pydantic import BaseModel, Field, SecretStr
 
-from text_to_sql.config.settings import AZURE_API_KEY, AZURE_API_VERSION, AZURE_ENDPOINT, PER_API_KEY, PER_ENDPOINT
 from text_to_sql.utils.logger import get_logger
 
+from .llm_config import AzureLLMConfig, PerplexityLLMConfig
+
 logger = get_logger(__name__)
-
-
-class BaseLLMConfig(BaseModel):
-    """
-    The Base LLM configurations class
-    """
-
-    endpoint: Optional[str] = Field(exclude=True, default=None)
-    api_key: Optional[SecretStr] = Field(exclude=True, default=None)
-    # for more accuracy we use lower temperature
-    temperature: float = 0.0
-    max_tokens: int = 700
-    model: str
-    llm_source: str
-
-
-class AzureLLMConfig(BaseLLMConfig):
-    """
-    Azure LLM configuration class
-    """
-
-    llm_source: str = "azure"
-    deployment_name: Literal["gpt-4", "gpt-35-turbo", "gpt-4-turbo"] = "gpt-35-turbo"
-    model: Literal["gpt-4", "gpt-35-turbo"] = "gpt-35-turbo"
-    api_version: str = AZURE_API_VERSION
-
-
-class PerplexityLLMConfig(BaseLLMConfig):
-    """
-    Perplexity LLM configuration class
-    """
-
-    llm_source: str = "perplexity"
-    model: Literal[
-        "sonar-small-chat", "sonar-medium-chat", "mistral-7b-instruct", "mistral-8x7b-instruct"
-    ] = "sonar-small-chat"
 
 
 class AzureLLM:
@@ -68,14 +32,14 @@ class AzureLLM:
             AzureChatOpenAI: An azure llm instance defined in langchain_openai
         """
         return AzureChatOpenAI(
-            azure_endpoint=config.endpoint or AZURE_ENDPOINT,
+            azure_endpoint=config.endpoint,
             deployment_name=config.deployment_name,
             model=config.model,
             openai_api_type=config.llm_source,
             openai_api_version=config.api_version,
             temperature=config.temperature,
             max_tokens=config.max_tokens,
-            openai_api_key=config.api_key or AZURE_API_KEY,
+            openai_api_key=config.api_key,
         )
 
 
@@ -96,8 +60,8 @@ class PerplexityLLM:
             ChatOpenAI: A perplexity llm instance defined in langchain_openai
         """
         return ChatOpenAI(
-            base_url=config.endpoint or PER_ENDPOINT,
-            api_key=config.api_key or PER_API_KEY,
+            base_url=config.endpoint,
+            api_key=config.api_key,
             model=config.model,
             temperature=config.temperature,
             max_tokens=config.max_tokens,

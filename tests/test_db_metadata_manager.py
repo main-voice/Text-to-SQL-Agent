@@ -12,11 +12,11 @@ class TestDBMetadataManager(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.mysql_test_engine = MySQLEngine(MySQLConfig())
-        cls.mysql_manager = DBMetadataManager(cls.mysql_test_engine)
+        mysql_test_engine = MySQLEngine(MySQLConfig())
+        cls.mysql_manager = DBMetadataManager(mysql_test_engine)
 
-        cls.postgresql_test_engine = PostgreSQLEngine(PostgreSQLConfig(db_name="broker"))
-        cls.postgresql_manager = DBMetadataManager(cls.postgresql_test_engine)
+        postgresql_test_engine = PostgreSQLEngine(PostgreSQLConfig(db_name="broker"))
+        cls.postgresql_manager = DBMetadataManager(postgresql_test_engine)
 
     def test_mysql_db_manager(self):
         # test if the table is in the database

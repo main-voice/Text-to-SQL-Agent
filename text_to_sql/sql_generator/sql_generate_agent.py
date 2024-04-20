@@ -15,11 +15,12 @@ from langchain_community.callbacks import get_openai_callback
 from langchain_core.agents import AgentAction
 from sqlalchemy.exc import SQLAlchemyError
 
-from text_to_sql.database.db_config import DBConfig, MySQLConfig
-from text_to_sql.database.db_engine import MySQLEngine
+from text_to_sql.database.db_config import DBConfig, MySQLConfig, PostgreSQLConfig
+from text_to_sql.database.db_engine import MySQLEngine, PostgreSQLEngine
 from text_to_sql.database.db_metadata_manager import DBMetadataManager
 from text_to_sql.llm.embedding_proxy import EmbeddingProxy
-from text_to_sql.llm.llm_proxy import AzureLLMConfig, BaseLLMConfig, LLMProxy
+from text_to_sql.llm.llm_config import AzureLLMConfig, BaseLLMConfig
+from text_to_sql.llm.llm_proxy import LLMProxy
 from text_to_sql.sql_generator.sql_agent_tools import SQLAgentToolkits
 from text_to_sql.utils import is_contain_chinese
 from text_to_sql.utils.logger import get_logger
@@ -54,9 +55,13 @@ class SQLGeneratorAgent:
     ):
         # set database metadata manager
         if db_config is None:
+            # by default, we use MySQL database
             self.db_metadata_manager = DBMetadataManager(MySQLEngine(MySQLConfig()))
         else:
-            self.db_metadata_manager = DBMetadataManager(MySQLEngine(db_config))
+            if isinstance(db_config, MySQLConfig):
+                self.db_metadata_manager = DBMetadataManager(MySQLEngine(db_config))
+            elif isinstance(db_config, PostgreSQLConfig):
+                self.db_metadata_manager = DBMetadataManager(PostgreSQLEngine(db_config))
 
         if llm_config is None:
             # If llm_config is None, we will use the default LLM which is Azure LLM
