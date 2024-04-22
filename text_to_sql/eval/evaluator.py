@@ -1,9 +1,12 @@
 """The Evaluator class is used to evaluate the generated SQL queries against the ground truth queries."""
+import json
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
 
 import pandas as pd
+from func_timeout import FunctionTimedOut, func_timeout
 
 from text_to_sql.database.db_config import DBConfig, MySQLConfig, PostgreSQLConfig
 from text_to_sql.database.db_engine import DBEngine, MySQLEngine, PostgreSQLEngine
@@ -142,16 +145,15 @@ class Evaluator:
         if self.model_type == "azure":
             logger.info("Creating Azure LLM Config for Evaluation...")
             self.llm_config = AzureLLMConfig(model=self.model)
+        else:
+            raise ValueError(f"Unsupported model type {model_type}")
 
         self.output_prefix = output_prefix
         self.parallel_threads = parallel_threads
         self.verbose = verbose
 
-        self.sql_generator: SQLGeneratorAgent | None = None
-
         self.llm_config = None
-
-        self.create_sql_generator()
+        self.sql_generator: SQLGeneratorAgent | None = None
 
     def create_sql_generator(self):
         """
@@ -164,12 +166,15 @@ class Evaluator:
 
     def eval(self) -> List[EvalResultItem]:
         """Evaluate the generated SQL queries against the ground truth queries."""
+
+        self.create_sql_generator()
+
         # first we have a dataframe with the questions and the ground truth queries
         eval_items: List[EvalItem] = self.loader.load_eval_items(max_rows=self.num_questions)
         eval_results: List[EvalResultItem] = []
 
         for eval_item in eval_items:
-            logger.info(f"Evaluating question: {eval_item.question}, the database is {eval_item.db_name}...")
+            logger.info(f"Start evaluating question: {eval_item.question}, the database is {eval_item.db_name}...")
 
             generated_query = self.sql_generator.generate_sql_with_agent(eval_item.question, single_line_format=True)
             result_item = EvalResultItem(
@@ -189,10 +194,7 @@ class Evaluator:
             logger.info(f"Generated query: {generated_query}.")
 
             logger.info("Evaluating the correctness of the generated query...")
-            result_item.exec_correct = self.eval_exec_correctness(
-                generated_query, eval_item.golden_query, eval_item.db_name
-            )
-            result_item.is_correct = result_item.exec_correct
+            self.check_query_correctness(result_item)
 
             eval_results.append(result_item)
 
@@ -200,7 +202,24 @@ class Evaluator:
 
         return eval_results
 
-    def eval_exec_correctness(self, generated_query: str, golden_query: str, db_name: str):
+    def check_query_correctness(self, result_item: EvalResultItem) -> EvalResultItem:
+        """Check the correctness of the generated query with the golden queries. Will check the execution correctness.
+        # TODO: Add more evaluation metrics.
+
+        Args:
+            result_item (EvalResultItem): the result item to be checked.
+
+        Returns:
+            EvalResultItem: the evaluated result item, with the comparison result.
+        """
+        # check if the generated query produces the same result as the golden query exactly
+        result_item.exec_correct = self.check_exec_correctness(
+            result_item.generated_query, result_item.golden_query, result_item.db_name
+        )
+        result_item.is_correct = result_item.exec_correct
+        return result_item
+
+    def check_exec_correctness(self, generated_query: str, golden_query: str, db_name: str):
         """Check the execution correctness of the generated queries.
 
         Args:
@@ -221,10 +240,90 @@ class Evaluator:
             logger.info(f"My SQL result: {my_result}")
             golden_result = self.query_db(golden_query, db_name)
             logger.info(f"Golden SQL result: {golden_result}")
-            return my_result == golden_result
+
+            # compare the results (shape, values, and indexes)
+            if my_result.equals(golden_result):
+                return True
+
+            # only compare the shape and values of the dataframes (ignore index and column name)
+            if my_result.shape == golden_result.shape and (my_result.values == golden_result.values).all():
+                return True
+
+            my_result = self.normalize_pd_table(my_result, "select", "question", generated_query)
+            golden_result = self.normalize_pd_table(golden_result, "select", "question", golden_query)
+            if my_result.shape == golden_result.shape and (my_result.values == golden_result.values).all():
+                return True
+
+            return False
         except ValueError as e:
             logger.error(f"Error in executing the query: {e}")
             return False
+
+    def normalize_pd_table(self, df: pd.DataFrame, query_category: str, question: str, sql: str = None) -> pd.DataFrame:
+        """
+        Normalizes a dataframe by:
+        1. removing all duplicate rows
+        2. sorting columns in alphabetical order
+        3. sorting rows using values from first column to last (if query_category is not 'order_by' and question
+        does not ask for ordering)
+        4. resetting index
+        """
+        # remove duplicate rows, if any
+        df = df.drop_duplicates()
+
+        # sort columns in alphabetical order of column names
+        sorted_df = df.reindex(sorted(df.columns), axis=1)
+
+        # check if query_category is 'order_by' and if question asks for ordering
+        has_order_by = False
+        pattern = re.compile(r"\b(order|sort|arrange)\b", re.IGNORECASE)
+        in_question = re.search(pattern, question.lower())  # true if contains
+        if query_category == "order_by" or in_question:
+            has_order_by = True
+
+            if sql:
+                # determine which columns are in the ORDER BY clause of the sql generated, using regex
+                pattern = re.compile(r"ORDER BY[\s\S]*", re.IGNORECASE)
+                order_by_clause = re.search(pattern, sql)
+                if order_by_clause:
+                    order_by_clause = order_by_clause.group(0)
+                    # get all columns in the ORDER BY clause, by looking at the text between ORDER BY and
+                    # the next semicolon, comma, or parantheses
+                    pattern = re.compile(r"(?<=ORDER BY)(.*?)(?=;|,|\)|$)", re.IGNORECASE)
+                    order_by_columns = re.findall(pattern, order_by_clause)
+                    order_by_columns = order_by_columns[0].split() if order_by_columns else []
+                    order_by_columns = [col.strip().rsplit(".", 1)[-1] for col in order_by_columns]
+
+                    ascending = False
+                    # if there is a DESC or ASC in the ORDER BY clause, set the ascending to that
+                    if "DESC" in [i.upper() for i in order_by_columns]:
+                        ascending = False
+                    elif "ASC" in [i.upper() for i in order_by_columns]:
+                        ascending = True
+
+                    # remove whitespace, commas, and parantheses
+                    order_by_columns = [col.strip() for col in order_by_columns]
+                    order_by_columns = [col.replace(",", "").replace("(", "") for col in order_by_columns]
+                    order_by_columns = [
+                        i
+                        for i in order_by_columns
+                        if i.lower() not in ["desc", "asc", "nulls", "last", "first", "limit"]
+                    ]
+
+                    # get all columns in sorted_df that are not in order_by_columns
+                    other_columns = [i for i in sorted_df.columns.tolist() if i not in order_by_columns]
+
+                    # only choose order_by_columns that are in sorted_df
+                    order_by_columns = [i for i in order_by_columns if i in sorted_df.columns.tolist()]
+                    sorted_df = sorted_df.sort_values(by=order_by_columns + other_columns, ascending=ascending)
+
+        if not has_order_by:
+            # sort rows using values from first column to last
+            sorted_df = sorted_df.sort_values(by=list(sorted_df.columns))
+
+        # reset index
+        sorted_df = sorted_df.reset_index(drop=True)
+        return sorted_df
 
     def save_output(self, eval_result: List[EvalResultItem]) -> str:
         """Save the evaluation output to a JSON file.
@@ -236,8 +335,10 @@ class Evaluator:
             str: path to the saved file, will connect the prefix with the current time
         """
         save_path = f"{self.output_prefix}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-        eval_result_df = pd.DataFrame([item.dict() for item in eval_result])
-        eval_result_df.to_json(save_path, orient="records", lines=True)
+        # save the evaluation result to a json file
+        eval_result_json = [item.dict() for item in eval_result]
+        with open(save_path, "w", encoding="utf-8") as f:
+            json.dump(eval_result_json, f, indent=4)
         logger.info(f"Saved the evaluation result to {save_path}.")
         return save_path
 
@@ -254,13 +355,21 @@ class Evaluator:
         Returns:
             DBEngine: the database engine
         """
-        if self.db_engine:
+        # if db_name is None, we return the db engine if it is already initialized
+        if db_name is None and self.db_engine:
+            logger.warning("No database name provided, using the existing db engine.")
+            return self.db_engine
+
+        # if db_name is provided and the db engine is already initialized with the same db_name, we return the db engine
+        if db_name and self.db_engine and self.db_engine.db_config.db_name == db_name:
+            logger.info(f"The database {db_name} engine is already initialized, use the existing one.")
             return self.db_engine
 
         # first call, so we need to initialize the db engine
         if not self.db_config and not self.db_type:
             raise ValueError("Database configuration is missing.")
 
+        # Create a new db engine if the db_name is different from the existing one
         # now the db_type is either the one provided explicitly or the one in the config
 
         if isinstance(self.db_config, PostgreSQLConfig):
@@ -278,7 +387,7 @@ class Evaluator:
 
         return self.db_engine
 
-    def query_db(self, query: str, db_name: str):
+    def query_db(self, query: str, db_name: str, timeout: int = 5) -> pd.DataFrame:
         """Query the database.
 
         Args:
@@ -288,8 +397,19 @@ class Evaluator:
         Returns:
             dict: The query result
         """
-        engine = self.get_db_engine(db_name=db_name)
-        return engine.execute(query)
+        engine = self.get_db_engine(db_name)
+        try:
+            if not engine:
+                raise ValueError("Failed to connect to the database.")
+            if not engine.connection:
+                engine.connect_db(db_name=db_name)
+
+            query_result = func_timeout(timeout, pd.read_sql_query, args=(query, engine.get_sqlalchemy_engine()))
+        except FunctionTimedOut as e:
+            logger.error(f"Query execution timeout: {e}")
+            return pd.DataFrame()
+        # in the evaluation, we only need the result as a pandas dataframe
+        return query_result
 
 
 if __name__ == "__main__":

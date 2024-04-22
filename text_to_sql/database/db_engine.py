@@ -6,7 +6,9 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
 
 import mysql.connector
+import pandas as pd
 import psycopg2
+from sqlalchemy import Engine, create_engine
 
 from text_to_sql.utils.logger import get_logger
 
@@ -69,11 +71,32 @@ class DBEngine(ABC):
         """Disconnect from the database to avoid resource leaks"""
         pass
 
+    def get_sqlalchemy_engine(self) -> Engine:
+        """
+        Create a SQLAlchemy engine for the database
+        """
+        url = self.get_connection_url()
+        return create_engine(url)
+
     @abstractmethod
     def execute(
-        self, statement: str, db_name: Optional[str] = None, params: Optional[Dict[str, Any]] = None
-    ) -> List[Dict[str, Any]]:
-        """Execute a query for the database, return the result as a list of dictionaries"""
+        self,
+        statement: str,
+        db_name: Optional[str] = None,
+        params: Optional[Dict[str, Any]] = None,
+        is_pd: bool = False,
+    ) -> List[Dict[str, Any]] | pd.DataFrame:
+        """Execute a query for the database, return the result as a list of dictionaries or a pandas DataFrame
+
+        Args:
+            statement (str): The SQL statement to be executed
+            db_name (Optional[str], optional): The database name to be connected. Defaults to None.
+            params (Optional[Dict[str, Any]], optional): Other params. Defaults to None.
+            is_pd (bool, optional): If return DataFrame format data. Defaults to False.
+
+        Returns:
+            List[Dict[str, Any]] | pd.DataFrame: The result of the query
+        """
         pass
 
 
@@ -172,8 +195,12 @@ class MySQLEngine(DBEngine):
             logger.info(f"Disconnected from MySQL database {self.db_config.db_name}")
 
     def execute(
-        self, statement: str, db_name: Optional[str] = None, params: Optional[Dict[str, Any]] = None
-    ) -> List[Dict[str, Any]]:
+        self,
+        statement: str,
+        db_name: Optional[str] = None,
+        params: Optional[Dict[str, Any]] = None,
+        is_pd: bool = False,
+    ) -> List[Dict[str, Any]] | pd.DataFrame:
         """
         Execute a query to the database
         """
@@ -184,8 +211,14 @@ class MySQLEngine(DBEngine):
                 if statement.lower().startswith("select"):
                     cursor.execute(statement, params)
                     logger.info(f"Executing SELECT query '{statement}'")
+
+                    rows = cursor.fetchall()
                     columns = [col[0] for col in cursor.description]
-                    return [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+                    if is_pd:
+                        # return as DataFrame for further processing
+                        return pd.DataFrame(rows, columns=columns)
+                    return [dict(zip(columns, row)) for row in rows]
 
                 supported_query = ["SELECT"]
                 raise ValueError(f"Only {supported_query} queries are supported for now! But got {statement}")
@@ -296,8 +329,12 @@ class PostgreSQLEngine(DBEngine):
             logger.info(f"Disconnected from PostgreSQL database {self.db_config.db_name}")
 
     def execute(
-        self, statement: str, db_name: Optional[str] = None, params: Optional[Dict[str, Any]] = None
-    ) -> List[Dict[str, Any]]:
+        self,
+        statement: str,
+        db_name: Optional[str] = None,
+        params: Optional[Dict[str, Any]] = None,
+        is_pd: bool = False,
+    ) -> List[Dict[str, Any]] | pd.DataFrame:
         try:
             self.connect_db(db_name)
         except Exception as e:
@@ -309,8 +346,14 @@ class PostgreSQLEngine(DBEngine):
                 if statement.lower().startswith("select"):
                     cursor.execute(statement, params)
                     logger.info(f"Executing SELECT query '{statement}'")
+
+                    rows = cursor.fetchall()
                     columns = [col[0] for col in cursor.description]
-                    return [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+                    if is_pd:
+                        # return as DataFrame for further processing
+                        return pd.DataFrame(rows, columns=columns)
+                    return [dict(zip(columns, row)) for row in rows]
 
                 supported_query = ["SELECT"]
                 raise ValueError(f"Only {supported_query} queries are supported for now! But got {statement}")
