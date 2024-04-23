@@ -282,6 +282,7 @@ class TablesSchemaTool(BaseSQLAgentTool, BaseTool):
             return (
                 "Bad input, please refer to examples which should be a list of table names separated by English comma."
             )
+        table_names = table_names.split("\n")[0].strip()
 
         table_names = table_names.split(",")
         table_names = [table_name.strip() for table_name in table_names]

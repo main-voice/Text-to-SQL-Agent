@@ -3,7 +3,7 @@ from typing import Any
 
 from langchain_community.utilities.sql_database import SQLDatabase
 
-from text_to_sql.llm.llm_proxy import PerplexityLLMConfig
+from text_to_sql.llm.llm_config import LLama3LLMConfig, PerplexityLLMConfig
 from text_to_sql.sql_generator.sql_generate_agent import SQLGeneratorAgent
 from text_to_sql.utils.logger import get_logger
 
@@ -53,6 +53,15 @@ class TestSQLGeneratorAgent(unittest.TestCase):
         question = "Find the user who has the most posts"
         simple_sql_agent = SQLGeneratorAgent(llm_config=PerplexityLLMConfig())
         sql = simple_sql_agent.generate_sql(user_query=question, verbose=True)
+        self.validate_sql(sql=sql, expected_result="baokker")
+
+    def test_sql_agent_llama3(self):
+        """
+        Test the SQLGeneratorAgent with LLama3 LLM
+        """
+        question = "Find the user who has the most posts"
+        simple_sql_agent = SQLGeneratorAgent(llm_config=LLama3LLMConfig())
+        sql = simple_sql_agent.generate_sql_with_agent(user_query=question, single_line_format=True)
         self.validate_sql(sql=sql, expected_result="baokker")
 
     def validate_sql(self, sql: str, expected_result: Any):

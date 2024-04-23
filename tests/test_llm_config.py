@@ -3,7 +3,7 @@ import unittest
 
 from dotenv import load_dotenv
 
-from text_to_sql.llm.llm_config import AzureLLMConfig, PerplexityLLMConfig
+from text_to_sql.llm.llm_config import AzureLLMConfig, LLama3LLMConfig, PerplexityLLMConfig
 
 
 class TestLLMConfig(unittest.TestCase):
@@ -32,3 +32,8 @@ class TestLLMConfig(unittest.TestCase):
         assert perplexity_llm_config.endpoint == os.environ.get("PERPLEXITY_ENDPOINT")
         assert perplexity_llm_config.api_key.get_secret_value() == os.getenv("PERPLEXITY_API_KEY")
         print(perplexity_llm_config.dict())
+
+        llama3_llm_config = LLama3LLMConfig(_env_file=self.test_env_abs_path)
+        assert llama3_llm_config.endpoint == os.environ.get("LLAMA3_ENDPOINT")
+        assert llama3_llm_config.api_key.get_secret_value() == os.getenv("LLAMA3_API_KEY")
+        print(llama3_llm_config.dict())
