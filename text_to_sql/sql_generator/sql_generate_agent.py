@@ -15,11 +15,12 @@ from langchain_community.callbacks import get_openai_callback
 from langchain_core.agents import AgentAction
 from sqlalchemy.exc import SQLAlchemyError
 
-from text_to_sql.database.db_config import DBConfig, MySQLConfig
-from text_to_sql.database.db_engine import MySQLEngine
+from text_to_sql.database.db_config import DBConfig, MySQLConfig, PostgreSQLConfig
+from text_to_sql.database.db_engine import MySQLEngine, PostgreSQLEngine
 from text_to_sql.database.db_metadata_manager import DBMetadataManager
 from text_to_sql.llm.embedding_proxy import EmbeddingProxy
-from text_to_sql.llm.llm_proxy import AzureLLMConfig, BaseLLMConfig, LLMProxy
+from text_to_sql.llm.llm_config import AzureLLMConfig, BaseLLMConfig
+from text_to_sql.llm.llm_proxy import LLMProxy
 from text_to_sql.sql_generator.sql_agent_tools import SQLAgentToolkits
 from text_to_sql.utils import is_contain_chinese
 from text_to_sql.utils.logger import get_logger
@@ -51,12 +52,19 @@ class SQLGeneratorAgent:
         embedding_proxy: EmbeddingProxy = None,
         db_config: DBConfig = None,
         top_k=5,
+        verbose=True,
     ):
         # set database metadata manager
         if db_config is None:
+            # by default, we use MySQL database
+            self.db_config = MySQLConfig()
             self.db_metadata_manager = DBMetadataManager(MySQLEngine(MySQLConfig()))
         else:
-            self.db_metadata_manager = DBMetadataManager(MySQLEngine(db_config))
+            self.db_config = db_config
+            if isinstance(db_config, MySQLConfig):
+                self.db_metadata_manager = DBMetadataManager(MySQLEngine(db_config))
+            elif isinstance(db_config, PostgreSQLConfig):
+                self.db_metadata_manager = DBMetadataManager(PostgreSQLEngine(db_config))
 
         if llm_config is None:
             # If llm_config is None, we will use the default LLM which is Azure LLM
@@ -74,8 +82,9 @@ class SQLGeneratorAgent:
             self.embedding_proxy = embedding_proxy
 
         self.top_k: int = top_k
+        self.verbose: bool = verbose
 
-    def create_sql_agent(self, early_stopping_method: str = "generate", verbose=True) -> AgentExecutor:
+    def create_sql_agent(self, early_stopping_method: str = "generate") -> AgentExecutor:
         """
         Create a SQL agent executor using our custom SQL agent tools and LLM
         """
@@ -92,11 +101,11 @@ class SQLGeneratorAgent:
         logger.info(f"The agent tools are: {tools_name}")
 
         # create LLM chain
-        prefix = SQL_AGENT_PREFIX.format(plan=PLAN_WITH_VALIDATION)
+        prefix = SQL_AGENT_PREFIX.format(db_type=self.db_config.db_type, plan=PLAN_WITH_VALIDATION)
         prompt = ZeroShotAgent.create_prompt(
             tools=agent_tools, prefix=prefix, suffix=SQL_AGENT_SUFFIX, format_instructions=FORMAT_INSTRUCTIONS
         )
-        llm_chain = LLMChain(llm=self.llm_proxy.llm, prompt=prompt, verbose=verbose)
+        llm_chain = LLMChain(llm=self.llm_proxy.llm, prompt=prompt, verbose=self.verbose)
 
         # create sql agent executor
         sql_agent = ZeroShotAgent(llm_chain=llm_chain, allowed_tools=tools_name)
@@ -111,12 +120,12 @@ class SQLGeneratorAgent:
         logger.info("Finished creating SQL agent executor.")
         return sql_agent_executor
 
-    def generate_sql_with_agent(self, user_query: str, single_line_format: bool = False, verbose=True) -> Any:
+    def generate_sql_with_agent(self, user_query: str, single_line_format: bool = False) -> Any:
         """
         Generate SQL statement using custom SQL agent executor
         """
         # create an agent executor
-        sql_agent_executor = self.create_sql_agent(verbose=verbose)
+        sql_agent_executor = self.create_sql_agent()
         sql_agent_executor.return_intermediate_steps = True
         sql_agent_executor.handle_parsing_errors = ERROR_PARSING_MESSAGE
 
@@ -143,7 +152,7 @@ class SQLGeneratorAgent:
                     f"error type: {type(e).__name__}"
                 )
                 return None
-            if verbose:
+            if self.verbose:
                 logger.info(f"The callback from openai is:\n{cb}\n")
 
         if not response:

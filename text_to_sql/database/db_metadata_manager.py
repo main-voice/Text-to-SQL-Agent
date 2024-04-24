@@ -8,10 +8,9 @@ from typing import List
 from sqlalchemy import MetaData, create_engine, inspect
 from sqlalchemy.sql.ddl import CreateTable
 
+from text_to_sql.database.db_engine import DBEngine
+from text_to_sql.database.models import ColumnMetadata, DatabaseMetadata, TableMetadata
 from text_to_sql.utils.logger import get_logger
-
-from .db_engine import DBEngine
-from .models import ColumnMetadata, DatabaseMetadata, TableMetadata
 
 # Notice, Engine is a class from sqlalchemy, while DBEngine is a class from db_engine.py, which is used to interact
 # with the database

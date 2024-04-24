@@ -8,10 +8,10 @@ from typing import Any, List, Optional, Union
 import torch
 from langchain_community.embeddings.huggingface import HuggingFaceEmbeddings
 from langchain_openai import AzureOpenAIEmbeddings
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, Field, validator
 from sentence_transformers import SentenceTransformer
 
-from text_to_sql.config.settings import AZURE_API_KEY, AZURE_API_VERSION, AZURE_ENDPOINT
+from text_to_sql.llm.llm_config import AzureLLMConfig
 from text_to_sql.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -22,7 +22,7 @@ class BaseEmbedding(BaseModel):
     Base class for embeddings
     """
 
-    model_name: str
+    model_name: Optional[Any] = Field(default=None, description="The model name")
     _available_models: List[str] = []
     embedding: Optional[Union[AzureOpenAIEmbeddings, HuggingFaceEmbeddings]] = None
 
@@ -33,7 +33,7 @@ class BaseEmbedding(BaseModel):
         raise NotImplementedError
 
 
-class AzureEmbedding(BaseEmbedding, BaseModel):
+class AzureEmbedding(BaseEmbedding):
     """
     Azure OpenAI Embedding
     """
@@ -65,19 +65,20 @@ class AzureEmbedding(BaseEmbedding, BaseModel):
             deploy_name = self.model_name.lower()
 
         logger.debug(f"You are using model: {self.model_name}, the deployment name is: {deploy_name}")
+        azure_llm_config = AzureLLMConfig()
 
         _azure_embedding = AzureOpenAIEmbeddings(
-            azure_endpoint=AZURE_ENDPOINT,
+            azure_endpoint=azure_llm_config.endpoint,
             deployment=deploy_name,
             model=self.model_name,
-            openai_api_key=AZURE_API_KEY,
-            openai_api_version=AZURE_API_VERSION,
+            openai_api_key=azure_llm_config.api_key,
+            openai_api_version=azure_llm_config.api_version,
         )
         self.embedding = _azure_embedding
         return self.embedding
 
 
-class HuggingFaceEmbedding(BaseEmbedding, BaseModel):
+class HuggingFaceEmbedding(BaseEmbedding):
     """
     Hugging Face Embedding
     """

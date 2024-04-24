@@ -6,7 +6,9 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
 
 import mysql.connector
+import pandas as pd
 import psycopg2
+from sqlalchemy import Engine, create_engine
 
 from text_to_sql.utils.logger import get_logger
 
@@ -39,7 +41,14 @@ class DBEngine(ABC):
         pass
 
     @abstractmethod
-    def connect(self, db_name: str = None):
+    def connect_server(self):
+        """
+        Connect to the server without specifying a database
+        """
+        pass
+
+    @abstractmethod
+    def connect_db(self, db_name: str = None):
         """Connect to the database using the provided configuration in __init__ method
 
         Args:
@@ -62,11 +71,32 @@ class DBEngine(ABC):
         """Disconnect from the database to avoid resource leaks"""
         pass
 
+    def get_sqlalchemy_engine(self) -> Engine:
+        """
+        Create a SQLAlchemy engine for the database
+        """
+        url = self.get_connection_url()
+        return create_engine(url)
+
     @abstractmethod
     def execute(
-        self, statement: str, db_name: Optional[str] = None, params: Optional[Dict[str, Any]] = None
-    ) -> List[Dict[str, Any]]:
-        """Execute a query for the database, return the result as a list of dictionaries"""
+        self,
+        statement: str,
+        db_name: Optional[str] = None,
+        params: Optional[Dict[str, Any]] = None,
+        is_pd: bool = False,
+    ) -> List[Dict[str, Any]] | pd.DataFrame:
+        """Execute a query for the database, return the result as a list of dictionaries or a pandas DataFrame
+
+        Args:
+            statement (str): The SQL statement to be executed
+            db_name (Optional[str], optional): The database name to be connected. Defaults to None.
+            params (Optional[Dict[str, Any]], optional): Other params. Defaults to None.
+            is_pd (bool, optional): If return DataFrame format data. Defaults to False.
+
+        Returns:
+            List[Dict[str, Any]] | pd.DataFrame: The result of the query
+        """
         pass
 
 
@@ -82,13 +112,27 @@ class MySQLEngine(DBEngine):
         return self.connection is not None and self.connection.is_connected()
 
     def available_databases(self) -> List[str]:
-        self.connect()
+        # only connect to the server when find available databases
+        self.connect_server()
         with self.connection.cursor() as cursor:
             cursor.execute("SHOW DATABASES;")
             return [row[0] for row in cursor.fetchall()]
 
     def get_connection_url(self) -> str:
         mysql_template = super().get_connection_url()
+        self.connect_server()
+        if self.db_config.db_name not in self.available_databases():
+            logger.error(f"Database {self.db_config.db_name} is not available in the MySQL server")
+            return mysql_template.format(
+                dialect=self.db_config.db_type,
+                driver=self.db_config.db_driver,
+                username=self.db_config.db_user,
+                password=self.db_config.db_password,
+                host=self.db_config.db_host,
+                port=self.db_config.db_port,
+                database="",
+            )
+
         return mysql_template.format(
             dialect=self.db_config.db_type,
             driver=self.db_config.db_driver,
@@ -99,7 +143,24 @@ class MySQLEngine(DBEngine):
             database=self.db_config.db_name,
         )
 
-    def connect(self, db_name: str = None):
+    def connect_server(self):
+        if self.is_connected():
+            return self.connection
+
+        try:
+            self.connection = mysql.connector.connect(
+                host=self.db_config.db_host,
+                user=self.db_config.db_user,
+                password=self.db_config.db_password,
+                port=self.db_config.db_port,
+            )
+            logger.info("Connected to MySQL server successfully")
+            return self.connection
+        except (mysql.connector.InterfaceError, mysql.connector.DatabaseError, mysql.connector.Error) as e:
+            logger.error(f"Failed to connect to MySQL server: {e}")
+            raise e
+
+    def connect_db(self, db_name: str = None):
         """Connect to the MySQL database using the provided configuration
 
         Raises:
@@ -108,18 +169,19 @@ class MySQLEngine(DBEngine):
         Returns:
             connection: The connection object to the MySQL database
         """
+        self.connect_server()
+        db_name = db_name or self.db_config.db_name
 
-        if self.is_connected():
-            return self.connection
+        if db_name not in self.available_databases():
+            raise ValueError(f"Database {db_name} is not available in the server")
 
         try:
-            db_name = db_name or self.db_config.db_name
             self.connection = mysql.connector.connect(
                 host=self.db_config.db_host,
                 user=self.db_config.db_user,
                 password=self.db_config.db_password,
                 port=self.db_config.db_port,
-                database=db_name if db_name else "",
+                database=db_name,
             )
             logger.info(f"Connected to MySQL database {self.db_config.db_name} successfully")
             return self.connection
@@ -133,23 +195,30 @@ class MySQLEngine(DBEngine):
             logger.info(f"Disconnected from MySQL database {self.db_config.db_name}")
 
     def execute(
-        self, statement: str, db_name: Optional[str] = None, params: Optional[Dict[str, Any]] = None
-    ) -> List[Dict[str, Any]]:
+        self,
+        statement: str,
+        db_name: Optional[str] = None,
+        params: Optional[Dict[str, Any]] = None,
+        is_pd: bool = False,
+    ) -> List[Dict[str, Any]] | pd.DataFrame:
         """
         Execute a query to the database
         """
-        if db_name:
-            self.connect(db_name)
-        else:
-            self.connect()
+        self.connect_db(db_name)
 
         try:
             with self.connection.cursor() as cursor:
                 if statement.lower().startswith("select"):
                     cursor.execute(statement, params)
                     logger.info(f"Executing SELECT query '{statement}'")
+
+                    rows = cursor.fetchall()
                     columns = [col[0] for col in cursor.description]
-                    return [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+                    if is_pd:
+                        # return as DataFrame for further processing
+                        return pd.DataFrame(rows, columns=columns)
+                    return [dict(zip(columns, row)) for row in rows]
 
                 supported_query = ["SELECT"]
                 raise ValueError(f"Only {supported_query} queries are supported for now! But got {statement}")
@@ -159,6 +228,7 @@ class MySQLEngine(DBEngine):
         finally:
             if cursor:
                 cursor.close()
+                self.disconnect()
 
 
 class PostgreSQLEngine(DBEngine):
@@ -174,6 +244,20 @@ class PostgreSQLEngine(DBEngine):
 
     def get_connection_url(self) -> str:
         postgres_template = super().get_connection_url()
+        self.connect_server()
+
+        if self.db_config.db_name not in self.available_databases():
+            logger.error(f"Database {self.db_config.db_name} is not available in the Postgres server")
+            return postgres_template.format(
+                dialect=self.db_config.db_type,
+                driver=self.db_config.db_driver,
+                username=self.db_config.db_user,
+                password=self.db_config.db_password,
+                host=self.db_config.db_host,
+                port=self.db_config.db_port,
+                database="",
+            )
+
         return postgres_template.format(
             dialect=self.db_config.db_type,
             driver=self.db_config.db_driver,
@@ -181,21 +265,51 @@ class PostgreSQLEngine(DBEngine):
             password=self.db_config.db_password,
             host=self.db_config.db_host,
             port=self.db_config.db_port,
-            database=self.db_config.db_name,
+            database=self.db_config.db_name or "",
         )
 
-    def available_databases(self) -> List[str]:
-        self.connect()
-        with self.connection.cursor() as cursor:
-            cursor.execute("SELECT datname FROM pg_database;")
-            return [row[0] for row in cursor.fetchall()]
-
-    def connect(self, db_name: str = None):
+    def connect_server(self):
         if self.is_connected():
             return self.connection
 
         try:
-            db_name = db_name or self.db_config.db_name
+            self.connection = psycopg2.connect(
+                host=self.db_config.db_host,
+                user=self.db_config.db_user,
+                password=self.db_config.db_password,
+                port=self.db_config.db_port,
+            )
+            logger.info("Connected to PostgreSQL server successfully")
+            return self.connection
+        except (psycopg2.InterfaceError, psycopg2.OperationalError, psycopg2.DatabaseError, psycopg2.Error) as e:
+            logger.error(f"Failed to connect to PostgreSQL server: {e}")
+            raise e
+
+    def available_databases(self) -> List[str]:
+        self.connect_server()
+        with self.connection.cursor() as cursor:
+            cursor.execute("SELECT datname FROM pg_database;")
+            return [row[0] for row in cursor.fetchall()]
+
+    def connect_db(self, db_name: str = None):
+        """Connect to the PostgreSQL database using the provided configuration
+
+        Args:
+            db_name (str, optional): The database name to be connected. Defaults to None.
+
+        Raises:
+            e: pyscopg2.InterfaceError, psycopg2.OperationalError, psycopg2.DatabaseError, psycopg2.Error
+
+        Returns:
+            connection: connection object to the PostgreSQL database
+        """
+        self.connect_server()
+        db_name = db_name or self.db_config.db_name
+
+        if db_name not in self.available_databases():
+            raise ValueError(f"Database {db_name} is not available in the server")
+
+        try:
             self.connection = psycopg2.connect(
                 host=self.db_config.db_host,
                 user=self.db_config.db_user,
@@ -203,11 +317,10 @@ class PostgreSQLEngine(DBEngine):
                 port=self.db_config.db_port,
                 database=db_name,
             )
-            logger.info(f"Connected to PostgreSQL database {self.db_config.db_name} successfully")
+            logger.info(f"Connected to PostgreSQL database {db_name} successfully")
             return self.connection
-
         except (psycopg2.InterfaceError, psycopg2.OperationalError, psycopg2.DatabaseError, psycopg2.Error) as e:
-            logger.error(f"Failed to connect to PostgreSQL database {self.db_config.db_name}: {e}")
+            logger.error(f"Failed to connect to PostgreSQL database {db_name}: {e}")
             raise e
 
     def disconnect(self):
@@ -216,14 +329,14 @@ class PostgreSQLEngine(DBEngine):
             logger.info(f"Disconnected from PostgreSQL database {self.db_config.db_name}")
 
     def execute(
-        self, statement: str, db_name: Optional[str] = None, params: Optional[Dict[str, Any]] = None
-    ) -> List[Dict[str, Any]]:
-
+        self,
+        statement: str,
+        db_name: Optional[str] = None,
+        params: Optional[Dict[str, Any]] = None,
+        is_pd: bool = False,
+    ) -> List[Dict[str, Any]] | pd.DataFrame:
         try:
-            if db_name:
-                self.connect(db_name)
-            else:
-                self.connect()
+            self.connect_db(db_name)
         except Exception as e:
             logger.error(f"Failed to connect to PostgreSQL database {self.db_config.db_name}: {e}")
             raise e
@@ -233,8 +346,14 @@ class PostgreSQLEngine(DBEngine):
                 if statement.lower().startswith("select"):
                     cursor.execute(statement, params)
                     logger.info(f"Executing SELECT query '{statement}'")
+
+                    rows = cursor.fetchall()
                     columns = [col[0] for col in cursor.description]
-                    return [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+                    if is_pd:
+                        # return as DataFrame for further processing
+                        return pd.DataFrame(rows, columns=columns)
+                    return [dict(zip(columns, row)) for row in rows]
 
                 supported_query = ["SELECT"]
                 raise ValueError(f"Only {supported_query} queries are supported for now! But got {statement}")
@@ -244,3 +363,4 @@ class PostgreSQLEngine(DBEngine):
         finally:
             if cursor:
                 cursor.close()
+                self.disconnect()
