@@ -184,6 +184,8 @@ class RelevantColumnsInfoTool(BaseSQLAgentTool, BaseTool):
         """
         logger.info(f"The Agent is calling tool: {self.name}. Input table and columns name: {table_with_columns}.")
 
+        # remove possible new line character
+        table_with_columns = table_with_columns.split("\n")[0].strip()
         table_column_items_list = table_with_columns.split(";")
         # remove those empty items
         table_column_items_list = [item.strip() for item in table_column_items_list if item.strip()]
@@ -282,6 +284,8 @@ class TablesSchemaTool(BaseSQLAgentTool, BaseTool):
             return (
                 "Bad input, please refer to examples which should be a list of table names separated by English comma."
             )
+        # remove possible new line character
+        table_names = table_names.split("\n")[0].strip()
 
         table_names = table_names.split(",")
         table_names = [table_name.strip() for table_name in table_names]

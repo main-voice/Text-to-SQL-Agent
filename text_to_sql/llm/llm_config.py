@@ -58,3 +58,16 @@ class PerplexityLLMConfig(BaseLLMConfig):
 
         # add prefix for perplexity llm related environment variables
         env_prefix = "PERPLEXITY_"
+
+
+class LLama3LLMConfig(BaseLLMConfig):
+    """The LLama3 LLM configurations class, mapped from .env file"""
+
+    model: Literal["llama3-70b"] = "llama3-70b"
+    llm_source: str = "meta"
+
+    class Config:
+        """Config for pydantic class"""
+
+        # add prefix for llama3 llm related environment variables
+        env_prefix = "LLAMA3_"

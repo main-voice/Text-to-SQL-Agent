@@ -13,7 +13,8 @@ from langchain.prompts import PromptTemplate
 from langchain_community.callbacks.manager import get_openai_callback
 
 from text_to_sql.config.settings import YD_APP_ID, YD_APP_SECRET_KEY
-from text_to_sql.llm.llm_proxy import AzureLLMConfig, LLMProxy
+from text_to_sql.llm.llm_config import AzureLLMConfig
+from text_to_sql.llm.llm_proxy import LLMProxy
 from text_to_sql.utils.logger import get_logger
 from text_to_sql.utils.prompt import TRANSLATOR_PROMPT
 

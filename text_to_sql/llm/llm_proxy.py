@@ -10,7 +10,7 @@ from langchain_openai import AzureChatOpenAI, ChatOpenAI
 
 from text_to_sql.utils.logger import get_logger
 
-from .llm_config import AzureLLMConfig, PerplexityLLMConfig
+from .llm_config import AzureLLMConfig, LLama3LLMConfig, PerplexityLLMConfig
 
 logger = get_logger(__name__)
 
@@ -68,18 +68,45 @@ class PerplexityLLM:
         )
 
 
+class LLama3LLM:
+    """The LLama3 LLM class"""
+
+    def __init__(self, config: LLama3LLMConfig):
+        self.llm = self.get_llm(config)
+
+    @staticmethod
+    def get_llm(config: LLama3LLMConfig) -> ChatOpenAI:
+        """Static method, will return a LLama3 LLM instance according to the configuration provided
+
+        Args:
+            config (LLama3LLMConfig): The config information for the LLama3 LLM
+
+        Returns:
+            ChatOpenAI: A llama3 llm instance defined in langchain_openai
+        """
+        return ChatOpenAI(
+            base_url=config.endpoint,
+            api_key=config.api_key,
+            model=config.llm_source + "/" + config.model,
+            temperature=config.temperature,
+            max_tokens=config.max_tokens,
+        )
+
+
 class LLMProxy:
     """
     A Proxy class to interact with the supported LLMs
     """
 
-    def __init__(self, config: AzureLLMConfig | PerplexityLLMConfig) -> None:
+    def __init__(self, config: AzureLLMConfig | PerplexityLLMConfig | LLama3LLMConfig) -> None:
         if config.llm_source == "azure":
             self.llm = AzureLLM(config).llm
         elif config.llm_source == "perplexity":
             self.llm = PerplexityLLM(config).llm
+        elif config.llm_source == "meta":
+            self.llm = LLama3LLM(config).llm
         else:
-            raise ValueError("Only Azure LLM and Perplexity LLM supported now!")
+            raise ValueError("Only [Azure, Perplexity, LLama3] LLM supported now!")
 
     def get_response_from_llm(self, question: Any, verbose: bool = False):
         """method to get response from LLM
