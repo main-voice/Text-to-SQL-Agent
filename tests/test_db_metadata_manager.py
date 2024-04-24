@@ -1,7 +1,7 @@
 import unittest
 
-from text_to_sql.database.db_config import DBConfig
-from text_to_sql.database.db_engine import MySQLEngine
+from text_to_sql.database.db_config import MySQLConfig, PostgreSQLConfig
+from text_to_sql.database.db_engine import MySQLEngine, PostgreSQLEngine
 from text_to_sql.database.db_metadata_manager import DBMetadataManager
 
 
@@ -12,26 +12,35 @@ class TestDBMetadataManager(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        test_engine = MySQLEngine(DBConfig())
-        cls.db_metadata_manager = DBMetadataManager(test_engine)
+        mysql_test_engine = MySQLEngine(MySQLConfig())
+        cls.mysql_manager = DBMetadataManager(mysql_test_engine)
 
-    def test_get_db_metadata(self):
-        db_metadata = self.db_metadata_manager.get_db_metadata()
+        postgresql_test_engine = PostgreSQLEngine(PostgreSQLConfig(db_name="broker"))
+        cls.postgresql_manager = DBMetadataManager(postgresql_test_engine)
+
+    def test_mysql_db_manager(self):
+        # test if the table is in the database
+        db_metadata = self.mysql_manager.get_db_metadata()
         tables_name = [table.table_name for table in db_metadata.tables]
         self.assertTrue("jk_user" in tables_name)
 
-    def test_get_table_metadata(self):
+        # test if the column is in the table
         test_table = "jk_user"
-        table_meta = self.db_metadata_manager.get_table_metadata(test_table)
+        table_meta = self.mysql_manager.get_table_metadata(test_table)
         columns_name = [column.column_name for column in table_meta.columns]
         self.assertTrue("id" in columns_name) and self.assertTrue("username" in columns_name)
 
-    def test_get_column_metadata(self):
-        test_table = "jk_user"
-        test_column = "username"
-        column_meta = self.db_metadata_manager.get_column_metadata_from_name(test_table, test_column)
-        print(column_meta)
-        self.assertTrue(column_meta is not None)
+    def test_postgresql_db_manager(self):
+        # test if the table is in the database
+        db_metadata = self.postgresql_manager.get_db_metadata()
+        tables_name = [table.table_name for table in db_metadata.tables]
+        self.assertTrue("sbcustomer" in tables_name)
+
+        # test if the column is in the table
+        test_table = "sbcustomer"
+        table_meta = self.postgresql_manager.get_table_metadata(test_table)
+        columns_name = [column.column_name for column in table_meta.columns]
+        self.assertTrue("sbcustid" in columns_name) and self.assertTrue("sbcustname" in columns_name)
 
 
 if __name__ == "__main__":

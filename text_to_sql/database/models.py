@@ -6,8 +6,6 @@ from typing import Any, List
 
 from pydantic import BaseModel, Field, validator
 
-from text_to_sql.database.db_engine import DBEngine
-
 
 class ColumnMetadata(BaseModel):
     """
@@ -15,12 +13,11 @@ class ColumnMetadata(BaseModel):
     """
 
     column_name: str = Field(alias="name")
-    is_nullable: bool = Field(alias="nullable")
     column_default: str | None = Field(alias="default")
-    comment: str | None
-    type: Any = "str"
+    comment: str | None = Field(alias="column_description")
+    data_type: Any = Field(alias="type")
 
-    @validator("type")
+    @validator("data_type")
     @classmethod
     def check_type(cls, input_type):
         # A demo input type is 'type': VARCHAR(charset='utf8mb4', collation='utf8mb4_unicode_ci', length=64)',
@@ -44,7 +41,7 @@ class TableMetadata(BaseModel):
 
     table_name: str
     columns: List[ColumnMetadata]
-    description: str | None
+    description: str | None = None
 
 
 class DatabaseMetadata(BaseModel):
@@ -52,13 +49,5 @@ class DatabaseMetadata(BaseModel):
     The class to store the metadata of a database
     """
 
-    db_engine: DBEngine
     tables: List[TableMetadata]
-    description: str | None
-
-    class Config:
-        """
-        pydantic config class, to allow custom class DBEngine to be used
-        """
-
-        arbitrary_types_allowed = True
+    description: str | None = None

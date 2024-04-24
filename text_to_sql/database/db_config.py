@@ -1,60 +1,59 @@
-"""
-Mapping to database configuration
-"""
+"""Configuration class for the database connection"""
 
-from text_to_sql.config.settings import DB_HOST, DB_NAME, DB_PASSWORD, DB_USER
+from pydantic import BaseSettings, Field
 
 
-class DBConfig:
+class DBConfig(BaseSettings):
     """
     Store the configuration info of the database
-    Use the info specified in the .env file by default
+    This is base class, should not be used directly
     """
 
-    def __init__(self, db_host=None, db_name=None, db_user=None, db_password=None):
-        self._db_type = "mysql"  # Only support mysql for now
-        self._db_host = db_host if db_host else DB_HOST
-        self._db_name = db_name if db_name else DB_NAME
-        self._db_user = db_user if db_user else DB_USER
-        self._db_password = db_password if db_password else DB_PASSWORD
+    # necessary info
+    db_host: str
+    db_user: str
+    db_password: str
 
-    def __repr__(self):
-        return f"DBConfig(db_type={self._db_type}, db_host={self._db_host},\
-                db_name={self._db_name}, db_user={self._db_user})"
+    # optional info
+    db_name: str = None
+    db_port: int = None
+    db_type: str = None
+    db_driver: str = None
 
-    @property
-    # Use property to wrapper the config info
-    def db_type(self):
-        return self._db_type
+    class Config:
+        """Config for pydantic class"""
 
-    @property
-    def db_host(self):
-        return self._db_host
+        env_path = "../config/.env"
+        env_file_encoding = "utf-8"
 
-    @db_host.setter
-    def db_host(self, value):
-        self._db_host = value
 
-    @property
-    def db_name(self):
-        return self._db_name
+class MySQLConfig(DBConfig):
+    """
+    Store the configuration info of the MySQL database
+    """
 
-    @db_name.setter
-    def db_name(self, value):
-        self._db_name = value
+    db_type: str = Field(default="mysql", const=True)
+    db_port: int = Field(default=3306)
+    db_driver: str = Field(default="mysqlconnector", const=True)
 
-    @property
-    def db_user(self):
-        return self._db_user
+    class Config:
+        """Config for pydantic class"""
 
-    @db_user.setter
-    def db_user(self, value):
-        self._db_user = value
+        # add prefix for mysql related environment variables
+        env_prefix = "MY_"
 
-    @property
-    def db_password(self):
-        return self._db_password
 
-    @db_password.setter
-    def db_password(self, value):
-        self._db_password = value
+class PostgreSQLConfig(DBConfig):
+    """
+    Store the configuration info of the PostgreSQL database
+    """
+
+    db_type: str = Field(default="postgresql", const=True)
+    db_port: int = Field(default=5432)
+    db_driver: str = Field(default="psycopg2", const=True)
+
+    class Config:
+        """Config for pydantic class"""
+
+        # add prefix for postgresql related environment variables
+        env_prefix = "PG_"

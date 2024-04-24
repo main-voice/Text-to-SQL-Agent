@@ -2,13 +2,15 @@
 This file is used to obtain the metadata of the database based on SqlAlchemy package
 """
 
+import re
+from typing import List
+
 from sqlalchemy import MetaData, create_engine, inspect
 from sqlalchemy.sql.ddl import CreateTable
 
+from text_to_sql.database.db_engine import DBEngine
+from text_to_sql.database.models import ColumnMetadata, DatabaseMetadata, TableMetadata
 from text_to_sql.utils.logger import get_logger
-
-from .db_engine import DBEngine
-from .models import ColumnMetadata, DatabaseMetadata, TableMetadata
 
 # Notice, Engine is a class from sqlalchemy, while DBEngine is a class from db_engine.py, which is used to interact
 # with the database
@@ -45,7 +47,7 @@ class DBMetadataManager:
             table_metadata = self.get_table_metadata(table_name)
             tables_meta.append(table_metadata)
 
-        return DatabaseMetadata(db_engine=self.db_engine, tables=tables_meta)
+        return DatabaseMetadata(tables=tables_meta)
 
     def get_table_metadata(self, table_name: str) -> TableMetadata:
         """
@@ -75,11 +77,11 @@ class DBMetadataManager:
             if column_meta["name"] == column_name:
                 return self.get_column_metadata(column_meta)
 
-    def get_available_table_names(self):
+    def get_available_table_names(self) -> List[str]:
         """
         return the list of table names in the database
         """
-        return self._metadata.tables.keys()
+        return list(self._metadata.tables.keys())
 
     def get_table_schema(self, table_name: str) -> str:
         """
@@ -88,7 +90,10 @@ class DBMetadataManager:
         table_meta = self._metadata.tables[table_name]
         _engine = create_engine(self.db_engine.get_connection_url())
         table_ddl = str(CreateTable(table_meta).compile(_engine))
-
+        table_ddl = table_ddl.replace("\n", " ").replace("\t", " ")
+        # remove multiple spaces
+        table_ddl = re.sub(r" +", " ", table_ddl)
+        table_ddl = table_ddl.strip()
         return table_ddl
 
     def get_tables_schema(self, table_names: list) -> dict:

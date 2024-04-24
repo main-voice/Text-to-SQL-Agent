@@ -2,19 +2,47 @@
   // Editor
   "editor.formatOnSave": true,
   "editor.rulers": [120],
-  // "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+
   // Files
   "files.autoSave": "onFocusChange",
   "files.associations": {
     "**/requirements{/**,*}.{txt,in}": "pip-requirements"
   },
-  // Python environment
-  // Unix system
+
+  // Platform-specific Python environments
   "python.defaultInterpreterPath": "${workspaceFolder}/venv/bin/python",
+
+  // Windows system
+  "windows": {
+    "python.defaultInterpreterPath": "${workspaceFolder}/venv/Scripts/python.exe",
+    "black-formatter.path": ["${workspaceFolder}/venv/Scripts/black.exe"],
+    "pylint.path": ["${workspaceFolder}/venv/Scripts/pylint.exe"],
+    "flake8.path": ["${workspaceFolder}/venv/Scripts/flake8.exe"],
+    "isort.path": ["${workspaceFolder}/venv/Scripts/isort.exe"]
+  },
+
+  // macOS and Linux systems
+  "osx": {
+    "python.defaultInterpreterPath": "${workspaceFolder}/venv/bin/python",
+    "black-formatter.path": ["${workspaceFolder}/venv/bin/black"],
+    "pylint.path": ["${workspaceFolder}/venv/bin/pylint"],
+    "flake8.path": ["${workspaceFolder}/venv/bin/flake8"],
+    "isort.path": ["${workspaceFolder}/venv/bin/isort"]
+  },
+  "linux": {
+    "python.defaultInterpreterPath": "${workspaceFolder}/venv/bin/python",
+    "black-formatter.path": ["${workspaceFolder}/venv/bin/black"],
+    "pylint.path": ["${workspaceFolder}/venv/bin/pylint"],
+    "flake8.path": ["${workspaceFolder}/venv/bin/flake8"],
+    "isort.path": ["${workspaceFolder}/venv/bin/isort"]
+  },
+
   // Formatting
   "black-formatter.args": [
     "--config=${workspaceFolder}/.linting/pyproject.toml"
   ],
+  // "black-formatter.path": ["${workspaceFolder}/venv/Scripts/black"],
   "[python]": {
     "editor.defaultFormatter": "ms-python.black-formatter",
     "editor.formatOnSave": true,
@@ -26,18 +54,9 @@
   "python.testing.unittestEnabled": false,
   "python.testing.pytestEnabled": true,
   "python.testing.pytestArgs": ["--no-header", "--capture=no"],
+
   // Linting
-  "pylint.path": ["${workspaceFolder}/venv/bin/pylint"],
   "pylint.args": ["--rcfile=${workspaceFolder}/.linting/.pylintrc"],
-
-  "flake8.path": ["${workspaceFolder}/venv/bin/flake8"],
   "flake8.args": ["--config=${workspaceFolder}/.linting/.flake8"],
-
-  "isort.path": ["${workspaceFolder}/venv/bin/isort"],
-  "isort.args": [
-    "--settings-path=${workspaceFolder}/.linting/pyproject.toml"
-  ],
-  "black-formatter.path": [
-    "venv/bin/black"
-  ]
+  "isort.args": ["--settings-path=${workspaceFolder}/.linting/pyproject.toml"]
 }

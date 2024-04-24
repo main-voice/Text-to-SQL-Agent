@@ -6,13 +6,14 @@ import hashlib
 import json
 import time
 from abc import ABC, abstractmethod
-from typing import Literal
+from typing import Any, Literal
 
 import requests
 from langchain.prompts import PromptTemplate
 from langchain_community.callbacks.manager import get_openai_callback
 
 from text_to_sql.config.settings import YD_APP_ID, YD_APP_SECRET_KEY
+from text_to_sql.llm.llm_config import AzureLLMConfig
 from text_to_sql.llm.llm_proxy import LLMProxy
 from text_to_sql.utils.logger import get_logger
 from text_to_sql.utils.prompt import TRANSLATOR_PROMPT
@@ -23,7 +24,7 @@ logger = get_logger(__name__)
 class BaseTranslator(ABC):
     """Abstract class for translator"""
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any):
         self.translate_source: Literal["llm", "youdao"] = "youdao"
 
     @abstractmethod
@@ -46,14 +47,15 @@ class LLMTranslator(BaseTranslator):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.translate_source = "llm"
-        self.llm_proxy = LLMProxy()
+        # for llm translation, we only use Azure LLM for now.
+        self.llm_proxy = LLMProxy(AzureLLMConfig())
 
     def translate(self, to_be_translate: str, *args, **kwargs) -> str:
         llm = self.llm_proxy.llm
         prompt_template = PromptTemplate.from_template(TRANSLATOR_PROMPT)
         prompt = prompt_template.format(input=to_be_translate)
 
-        if "verbose" in kwargs.keys():
+        if kwargs.get("verbose"):
             if kwargs["verbose"]:
                 with get_openai_callback() as cb:
                     _resp = llm.invoke(input=prompt)
@@ -100,7 +102,12 @@ class YoudaoTranslator(BaseTranslator):
     def translate(self, to_be_translate: str, *args, **kwargs) -> str:
         params = self.youdao_get_url_encoded_params(to_be_translate=to_be_translate)
         header = {"Content-Type": "application/x-www-form-urlencoded"}
-        response = requests.get(self.yd_base_url, headers=header, params=params, timeout=7).text
+        try:
+            response = requests.get(self.yd_base_url, headers=header, params=params, timeout=7).text
+        except Exception as e:
+            logger.error(f"Error while translating text: {to_be_translate}")
+            raise e
+
         json_data = json.loads(response)
         trans_text = json_data["translation"][0]
         return trans_text

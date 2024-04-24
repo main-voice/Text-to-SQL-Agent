@@ -2,79 +2,121 @@
 Proxy class to supported LLM client
 """
 
-from typing import Any, Literal, Optional
+from typing import Any
 
-# Seems pylint can't handle import package dynamically
 # pylint: disable=no-name-in-module
 from langchain_community.callbacks import get_openai_callback
-from langchain_openai import AzureChatOpenAI
-from pydantic import BaseModel, Field
+from langchain_openai import AzureChatOpenAI, ChatOpenAI
 
-from text_to_sql.config.settings import AZURE_API_KEY, AZURE_ENDPOINT, AZURE_GPT_4
 from text_to_sql.utils.logger import get_logger
+
+from .llm_config import AzureLLMConfig, LLama3LLMConfig, PerplexityLLMConfig
 
 logger = get_logger(__name__)
 
 
-class BaseLLMConfig(BaseModel):
-    """
-    The Base LLM configurations class
-    """
+class AzureLLM:
+    """The Azure LLM class"""
 
-    temperature: float = 0.0
-    max_tokens: int = 1024
-    model: str
+    def __init__(self, config: AzureLLMConfig):
+        self.llm = self.get_llm(config)
+
+    @staticmethod
+    def get_llm(config: AzureLLMConfig) -> AzureChatOpenAI:
+        """Static method, will return a Azure LLM instance according to the configuration provided
+
+        Args:
+            config (AzureLLMConfig): The config information for the Azure LLM
+
+        Returns:
+            AzureChatOpenAI: An azure llm instance defined in langchain_openai
+        """
+        return AzureChatOpenAI(
+            azure_endpoint=config.endpoint,
+            deployment_name=config.deployment_name,
+            model=config.model,
+            openai_api_type=config.llm_source,
+            openai_api_version=config.api_version,
+            temperature=config.temperature,
+            max_tokens=config.max_tokens,
+            openai_api_key=config.api_key,
+        )
 
 
-class AzureLLMConfig(BaseLLMConfig):
-    """
-    Azure LLM configuration class
-    """
+class PerplexityLLM:
+    """The Perplexity LLM class"""
 
-    azure_endpoint: Optional[str] = Field(exclude=True, default=None)
-    deployment_name: Literal["gpt-4", "gpt-35-turbo", "gpt-4-turbo"] = "gpt-35-turbo"
-    model: Literal["gpt-4", "gpt-35-turbo"] = "gpt-35-turbo"
-    api_version: str = "2023-08-01-preview"
-    api_key: Optional[str] = Field(exclude=True, default=None)
+    def __init__(self, config: PerplexityLLMConfig):
+        self.llm = self.get_llm(config)
+
+    @staticmethod
+    def get_llm(config: PerplexityLLMConfig) -> ChatOpenAI:
+        """Static method, will return a Perplexity LLM instance according to the configuration provided
+
+        Args:
+            config (PerplexityLLMConfig): The config information for the Perplexity LLM
+
+        Returns:
+            ChatOpenAI: A perplexity llm instance defined in langchain_openai
+        """
+        return ChatOpenAI(
+            base_url=config.endpoint,
+            api_key=config.api_key,
+            model=config.model,
+            temperature=config.temperature,
+            max_tokens=config.max_tokens,
+        )
+
+
+class LLama3LLM:
+    """The LLama3 LLM class"""
+
+    def __init__(self, config: LLama3LLMConfig):
+        self.llm = self.get_llm(config)
+
+    @staticmethod
+    def get_llm(config: LLama3LLMConfig) -> ChatOpenAI:
+        """Static method, will return a LLama3 LLM instance according to the configuration provided
+
+        Args:
+            config (LLama3LLMConfig): The config information for the LLama3 LLM
+
+        Returns:
+            ChatOpenAI: A llama3 llm instance defined in langchain_openai
+        """
+        return ChatOpenAI(
+            base_url=config.endpoint,
+            api_key=config.api_key,
+            model=config.llm_source + "/" + config.model,
+            temperature=config.temperature,
+            max_tokens=config.max_tokens,
+        )
 
 
 class LLMProxy:
     """
-    A Proxy class to interact with the LLM
+    A Proxy class to interact with the supported LLMs
     """
 
-    def __init__(self, llm_name: str = "azure"):
-        self.llm_config = None
-        self.llm = None
-
-        if llm_name == "azure":
-            if AZURE_GPT_4:
-                self.llm_config = AzureLLMConfig(
-                    azure_endpoint=AZURE_ENDPOINT, api_key=AZURE_API_KEY, model="gpt-4", deployment_name="gpt-4-turbo"
-                )
-            else:
-                self.llm_config = AzureLLMConfig(
-                    azure_endpoint=AZURE_ENDPOINT,
-                    api_key=AZURE_API_KEY,
-                    model="gpt-35-turbo",
-                    deployment_name="gpt-35-turbo",
-                )
-            self.llm = AzureChatOpenAI(
-                azure_endpoint=self.llm_config.azure_endpoint,
-                deployment_name=self.llm_config.deployment_name,
-                model=self.llm_config.model,
-                openai_api_type="azure",
-                openai_api_version=self.llm_config.api_version,
-                temperature=self.llm_config.temperature,
-                max_tokens=self.llm_config.max_tokens,
-                openai_api_key=self.llm_config.api_key,
-            )
+    def __init__(self, config: AzureLLMConfig | PerplexityLLMConfig | LLama3LLMConfig) -> None:
+        if config.llm_source == "azure":
+            self.llm = AzureLLM(config).llm
+        elif config.llm_source == "perplexity":
+            self.llm = PerplexityLLM(config).llm
+        elif config.llm_source == "meta":
+            self.llm = LLama3LLM(config).llm
         else:
-            raise ValueError("Only Azure LLM supported now!")
+            raise ValueError("Only [Azure, Perplexity, LLama3] LLM supported now!")
 
     def get_response_from_llm(self, question: Any, verbose: bool = False):
-        """
-        Get response from the LLM for the given question
+        """method to get response from LLM
+
+        Args:
+            question (Any): the question to ask the LLM
+            verbose (bool, optional): if to print token usage. Defaults to False.
+
+        Returns:
+            BaseMessage: An message object with the response from the LLM
         """
         if verbose:
             with get_openai_callback() as cb:
