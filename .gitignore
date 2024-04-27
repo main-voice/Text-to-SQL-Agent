@@ -168,3 +168,9 @@ text_to_sql/llm/model_assets/
 data/
 # docs
 docs/
+
+# plugin
+.VSCodeCounter/
+
+# eval results
+text_to_sql/eval/eval_results/

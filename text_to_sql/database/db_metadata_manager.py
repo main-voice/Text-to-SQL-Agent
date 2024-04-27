@@ -77,6 +77,9 @@ class DBMetadataManager:
             if column_meta["name"] == column_name:
                 return self.get_column_metadata(column_meta)
 
+        logger.error(f"Column {column_name} not found in table {table_name}")
+        return None
+
     def get_available_table_names(self) -> List[str]:
         """
         return the list of table names in the database
