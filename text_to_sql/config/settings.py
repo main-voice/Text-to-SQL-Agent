@@ -6,31 +6,47 @@ Create a .env in the same folder first
 import logging
 import os
 
-from dotenv import load_dotenv
-
-load_dotenv()
-
-# For developer
-DEBUG = os.environ.get("DEBUG", "False") == "True"
-LOGGING_LEVEL = logging.DEBUG if DEBUG else logging.INFO
+from pydantic import BaseSettings, Field, SecretStr
 
 
-# Embedding model
-AZURE_EMBEDDING_MODEL = os.environ.get("AZURE_EMBEDDING_MODEL", None)
-HUGGING_FACE_EMBEDDING_MODEL = os.environ.get("HUGGING_FACE_EMBEDDING_MODEL", None)
+class Settings(BaseSettings):
+    """Store the settings for the application using pydantic"""
+
+    DEBUG: bool = False
+    LOGGING_LEVEL = logging.DEBUG if DEBUG else logging.INFO
+
+    # Embedding model
+    AZURE_EMBEDDING_MODEL: str = None
+    HUGGING_FACE_EMBEDDING_MODEL: str = None
+
+    # You Dao translate service
+    YD_BASE_URL: str = Field(default=None)
+    YD_APP_ID: SecretStr = Field(default=None, exclude=True)
+    YD_APP_SECRET_KEY: SecretStr = Field(default=None, exclude=True)
+
+    TOP_K: int = 5  # Top K relevant tables
+
+    # Max input length
+    MAX_INPUT_LENGTH: int = 256
+
+    # Langchain Smith
+    LANGCHAIN_TRACING_V2: bool = False
+    LANGCHAIN_API_KEY: str = None
+    LANGCHAIN_PROJECT: str = None
+
+    # Sentry
+    SENTRY_DSN: SecretStr = Field(default=None, exclude=True)
+    ENVIRONMENT: str = "development"
+
+    class Config:
+        """Config class for pydantic"""
+
+        # Get the absolute path of the .env file (ATTENTION: relative path maybe failed in some cases)
+        # https://github.com/pydantic/pydantic/issues/1368
+        current_dir_path = os.path.dirname(__file__)
+
+        env_file = os.path.join(current_dir_path, ".env")
 
 
-# You Dao translate service
-YD_APP_ID = os.environ.get("YD_APP_ID", None)
-YD_APP_SECRET_KEY = os.environ.get("YD_APP_SECRET_KEY", None)
-
-# TOP K relevant tables
-TOP_K = int(os.environ.get("TOP_K", 5))
-
-# Langchain Smith
-LANGCHAIN_TRACING_V2 = os.environ.get("LANGCHAIN_TRACING_V2", "False") == "True"
-LANGCHAIN_API_KEY = os.environ.get("LANGCHAIN_API_KEY", None)
-LANGCHAIN_PROJECT = os.environ.get("LANGCHAIN_PROJECT", None)
-
-SENTRY_DSN = os.environ.get("SENTRY_DSN", None)
-ENVIRONMENT = os.environ.get("ENVIRONMENT", "development")
+# Singleton settings
+settings = Settings()

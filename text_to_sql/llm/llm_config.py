@@ -1,5 +1,6 @@
 """Set up the LLM configurations using pydantic."""
 
+import os
 from typing import Literal, Optional
 
 from pydantic import BaseSettings, Field, SecretStr
@@ -26,7 +27,8 @@ class BaseLLMConfig(BaseSettings):
     class Config:
         """Config for pydantic class"""
 
-        env_path = "../config/.env"
+        current_dir = os.path.dirname(__file__)
+        env_file = os.path.join(current_dir, "../config/.env")
         env_file_encoding = "utf-8"
 
 
