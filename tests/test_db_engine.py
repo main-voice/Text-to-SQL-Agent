@@ -58,11 +58,8 @@ class TestDatabaseEngine(unittest.TestCase):
         mysql_engine = MySQLEngine(MySQLConfig())
         mysql_engine.execute(self.mysql_test_query)
 
-        return
-        # TODO: Add a test case for PostgresSQL
-        with self.assertRaises(ValueError):
-            pg_engine = PostgreSQLEngine(PostgreSQLConfig())
-            pg_engine.execute(self.pg_test_query)
+        pg_engine = PostgreSQLEngine(PostgreSQLConfig())
+        pg_engine.execute(self.pg_test_query, db_name=self.pg_test_db_name)
 
     def test_not_select_query(self):
         mysql_engine = MySQLEngine(MySQLConfig())
@@ -96,11 +93,11 @@ class TestDatabaseEngine(unittest.TestCase):
         """
         mysql_engine = MySQLEngine(MySQLConfig(db_host="localhost", db_user="non_existent_user"))
         with self.assertRaises(mysql.connector.Error):
-            mysql_engine.connect()
+            mysql_engine.connect_db()
 
         pg_engine = PostgreSQLEngine(PostgreSQLConfig(db_host="localhost", db_user="non_existent_user"))
         with self.assertRaises(psycopg2.DatabaseError or psycopg2.InterfaceError or psycopg2.Error):
-            pg_engine.connect()
+            pg_engine.connect_db()
 
     def test_close_connection(self):
         """
