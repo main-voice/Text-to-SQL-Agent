@@ -174,3 +174,6 @@ docs/
 
 # eval results
 text_to_sql/eval/eval_results/
+
+# logs
+text_to_sql/logs/
