@@ -14,6 +14,279 @@
       "justMyCode": false
     },
     {
+      "name": "Eval Simple Agent using LLama3 - Smoke Test",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/text_to_sql/eval/evaluator.py",
+      "console": "integratedTerminal",
+      "args": [
+        "--model_type",
+        "llama3",
+        "--model",
+        "llama3-70b-instruct",
+        "--eval_method",
+        "simple",
+        "--num_quesions",
+        "1"
+      ],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      }
+    },
+    {
+      "name": "Smoke Test - Eval Simple Agent using Azure gpt-35-turbo",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/text_to_sql/eval/evaluator.py",
+      "console": "integratedTerminal",
+      "args": [
+        "--model_type",
+        "azure",
+        "--model",
+        "gpt-35-turbo",
+        "--eval_method",
+        "simple",
+        "--num_questions",
+        "1"
+      ],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      }
+    },
+    {
+      "name": "Smoke Test - Eval Langchain Agent with Azure gpt-35-turbo",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/text_to_sql/eval/evaluator.py",
+      "console": "integratedTerminal",
+      "args": [
+        "--model_type",
+        "azure",
+        "--model",
+        "gpt-35-turbo",
+        "--eval_method",
+        "langchain",
+        "--num_questions",
+        "2"
+      ],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      }
+    },
+    {
+      "name": "Smoke Test - Eval Tools Agent with Azure gpt-35-turbo",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/text_to_sql/eval/evaluator.py",
+      "console": "integratedTerminal",
+      "args": [
+        "--model_type",
+        "azure",
+        "--model",
+        "gpt-35-turbo",
+        "--eval_method",
+        "agent",
+        "--num_questions",
+        "2"
+      ],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      }
+    },
+    {
+      "name": "Smoke Test - Eval Simple Agent with LLama3 70b",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/text_to_sql/eval/evaluator.py",
+      "console": "integratedTerminal",
+      "args": [
+        "--model_type",
+        "llama3",
+        "--model",
+        "llama3-70b-instruct",
+        "--eval_method",
+        "simple",
+        "--num_questions",
+        "2"
+      ],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      }
+    },
+    {
+      "name": "Smoke Test - Eval Langchain Agent with LLama3 70b",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/text_to_sql/eval/evaluator.py",
+      "console": "integratedTerminal",
+      "args": [
+        "--model_type",
+        "llama3",
+        "--model",
+        "llama3-70b-instruct",
+        "--eval_method",
+        "langchain",
+        "--num_questions",
+        "2"
+      ],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      }
+    },
+    {
+      "name": "Smoke Test - Eval Agent with LLama3 70b",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/text_to_sql/eval/evaluator.py",
+      "console": "integratedTerminal",
+      "args": [
+        "--model_type",
+        "llama3",
+        "--model",
+        "llama3-70b-instruct",
+        "--eval_method",
+        "agent",
+        "--num_questions",
+        "2"
+      ],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      }
+    },
+    {
+      "name": "Prod: Eval Simple Agent using LLama3 70b",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/text_to_sql/eval/evaluator.py",
+      "console": "integratedTerminal",
+      "args": [
+        "--model_type",
+        "llama3",
+        "--model",
+        "llama3-70b-instruct",
+        "--eval_method",
+        "simple",
+        "--num_questions",
+        "250"
+      ],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      }
+    },
+    {
+      "name": "Prod: Eval Langchain Agent using LLama3 70b",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/text_to_sql/eval/evaluator.py",
+      "console": "integratedTerminal",
+      "args": [
+        "--model_type",
+        "llama3",
+        "--model",
+        "llama3-70b-instruct",
+        "--eval_method",
+        "langchain",
+        "--num_questions",
+        "250"
+      ],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      }
+    },
+    {
+      "name": "Prod: Eval Agent using LLama3 70b",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/text_to_sql/eval/evaluator.py",
+      "console": "integratedTerminal",
+      "args": [
+        "--model_type",
+        "llama3",
+        "--model",
+        "llama3-70b-instruct",
+        "--eval_method",
+        "agent",
+        "--num_questions",
+        "250"
+      ],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      }
+    },
+    {
+      "name": "Prod: Eval Agent using Azure gpt-35-turbo",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/text_to_sql/eval/evaluator.py",
+      "console": "integratedTerminal",
+      "args": [
+        "--model_type",
+        "azure",
+        "--model",
+        "gpt-35-turbo",
+        "--eval_method",
+        "agent",
+        "--num_questions",
+        "250"
+      ],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      }
+    },
+    {
+      "name": "Prod: Eval Simple Agent using Azure gpt-35-turbo",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/text_to_sql/eval/evaluator.py",
+      "console": "integratedTerminal",
+      "args": [
+        "--model_type",
+        "azure",
+        "--model",
+        "gpt-35-turbo",
+        "--eval_method",
+        "simple",
+        "--num_questions",
+        "250"
+      ],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      }
+    },
+    {
+      "name": "Prod: Eval Langchain using Azure gpt-35-turbo",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/text_to_sql/eval/evaluator.py",
+      "console": "integratedTerminal",
+      "args": [
+        "--model_type",
+        "azure",
+        "--model",
+        "gpt-35-turbo",
+        "--eval_method",
+        "langchain",
+        "--num_questions",
+        "250"
+      ],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      }
+    },
+    {
       "name": "template",
       "type": "debugpy",
       "request": "launch",

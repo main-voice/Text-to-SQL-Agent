@@ -6,14 +6,15 @@ Create a .env in the same folder first
 import logging
 import os
 
-from pydantic import BaseSettings, Field, SecretStr
+from pydantic import BaseSettings, Field, SecretStr, validator
 
 
 class Settings(BaseSettings):
     """Store the settings for the application using pydantic"""
 
-    DEBUG: bool = False
-    LOGGING_LEVEL = logging.DEBUG if DEBUG else logging.INFO
+    DEBUG: str = "False"
+    LOGGING_LEVEL: int = None
+    LOGS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "logs")
 
     # Embedding model
     AZURE_EMBEDDING_MODEL: str = None
@@ -46,6 +47,12 @@ class Settings(BaseSettings):
         current_dir_path = os.path.dirname(__file__)
 
         env_file = os.path.join(current_dir_path, ".env")
+
+    @validator("LOGGING_LEVEL", always=True)
+    @classmethod
+    def validate_logging_level(cls, v, values):
+        """Validate the logging level"""
+        return logging.DEBUG if values["DEBUG"] == "True" else logging.INFO
 
 
 # Singleton settings

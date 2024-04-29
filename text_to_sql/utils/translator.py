@@ -91,13 +91,15 @@ class YoudaoTranslator(BaseTranslator):
         """
         # the random number to be used to generate the sign
         salt = str(round(time.time() * 1000))
-        sign_raw = self.yd_app_id + to_be_translate + salt + self.yd_app_secret_key
+        sign_raw = (
+            self.yd_app_id.get_secret_value() + to_be_translate + salt + self.yd_app_secret_key.get_secret_value()
+        )
         sign = hashlib.md5(sign_raw.encode("utf8")).hexdigest()
         params = {
             "q": to_be_translate,
             "from": "auto",
             "to": "en",
-            "appKey": self.yd_app_id,
+            "appKey": self.yd_app_id.get_secret_value(),
             "salt": salt,
             "sign": sign,
         }
