@@ -33,7 +33,7 @@ class TestDatabaseEngine(unittest.TestCase):
         mysql_db_config = MySQLConfig(db_name=self.mysql_test_db_name)
         mysql_engine = MySQLEngine(db_config=mysql_db_config)
 
-        mysql_engine.connect()
+        mysql_engine.connect_db()
         result = mysql_engine.execute(self.mysql_test_query)
         print(result)
         mysql_engine.disconnect()
