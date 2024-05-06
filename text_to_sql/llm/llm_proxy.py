@@ -2,7 +2,8 @@
 Proxy class to supported LLM client
 """
 
-from typing import Any
+from abc import ABC, abstractmethod
+from typing import Any, Type
 
 # pylint: disable=no-name-in-module
 from langchain_community.callbacks import get_openai_callback
@@ -10,20 +11,27 @@ from langchain_openai import AzureChatOpenAI, ChatOpenAI
 
 from text_to_sql.utils.logger import get_logger
 
-from .llm_config import AzureLLMConfig, LLama3LLMConfig, PerplexityLLMConfig
+from .llm_config import AzureLLMConfig, BaseLLMConfig, LLama3LLMConfig, PerplexityLLMConfig
 
 logger = get_logger(__name__)
 
 
-class AzureLLM:
+class BaseLLM(ABC):
+    """The Base LLM class, claims the method that should be implemented by the child classes"""
+
+    @abstractmethod
+    def get_llm_instance(self, config: BaseLLMConfig) -> ChatOpenAI:
+        """
+        Return a LLM instance according to the configuration provided
+        """
+        pass
+
+
+class AzureLLM(BaseLLM):
     """The Azure LLM class"""
 
-    def __init__(self, config: AzureLLMConfig):
-        self.llm = self.get_llm(config)
-
-    @staticmethod
-    def get_llm(config: AzureLLMConfig) -> AzureChatOpenAI:
-        """Static method, will return a Azure LLM instance according to the configuration provided
+    def get_llm_instance(self, config: BaseLLMConfig) -> AzureChatOpenAI:
+        """Create a Azure LLM instance according to the configuration provided
 
         Args:
             config (AzureLLMConfig): The config information for the Azure LLM
@@ -31,27 +39,30 @@ class AzureLLM:
         Returns:
             AzureChatOpenAI: An azure llm instance defined in langchain_openai
         """
-        return AzureChatOpenAI(
-            azure_endpoint=config.endpoint,
-            deployment_name=config.deployment_name,
-            model=config.model,
-            openai_api_type=config.llm_source,
-            openai_api_version=config.api_version,
-            temperature=config.temperature,
-            max_tokens=config.max_tokens,
-            openai_api_key=config.api_key,
-        )
+        if not isinstance(config, AzureLLMConfig):
+            raise TypeError(f"Expected AzureLLMConfig, got {type(config)}")
+
+        try:
+            return AzureChatOpenAI(
+                azure_endpoint=config.endpoint,
+                deployment_name=config.deployment_name,
+                model=config.model,
+                openai_api_type=config.llm_source,
+                openai_api_version=config.api_version,
+                temperature=config.temperature,
+                max_tokens=config.max_tokens,
+                openai_api_key=config.api_key,
+            )
+        except Exception as e:
+            logger.error(f"Failed to creat Azure LLM instance: {e}")
+            raise e
 
 
-class PerplexityLLM:
+class PerplexityLLM(BaseLLM):
     """The Perplexity LLM class"""
 
-    def __init__(self, config: PerplexityLLMConfig):
-        self.llm = self.get_llm(config)
-
-    @staticmethod
-    def get_llm(config: PerplexityLLMConfig) -> ChatOpenAI:
-        """Static method, will return a Perplexity LLM instance according to the configuration provided
+    def get_llm_instance(self, config: BaseLLMConfig) -> ChatOpenAI:
+        """Return a Perplexity LLM instance according to the configuration provided
 
         Args:
             config (PerplexityLLMConfig): The config information for the Perplexity LLM
@@ -59,23 +70,26 @@ class PerplexityLLM:
         Returns:
             ChatOpenAI: A perplexity llm instance defined in langchain_openai
         """
-        return ChatOpenAI(
-            base_url=config.endpoint,
-            api_key=config.api_key,
-            model=config.model,
-            temperature=config.temperature,
-            max_tokens=config.max_tokens,
-        )
+        if not isinstance(config, PerplexityLLMConfig):
+            raise TypeError(f"Expected PerplexityLLMConfig, got {type(config)}")
+
+        try:
+            return ChatOpenAI(
+                base_url=config.endpoint,
+                api_key=config.api_key,
+                model=config.model,
+                temperature=config.temperature,
+                max_tokens=config.max_tokens,
+            )
+        except Exception as e:
+            logger.error(f"Failed to creat Perplexity LLM instance: {e}")
+            raise e
 
 
-class LLama3LLM:
+class LLama3LLM(BaseLLM):
     """The LLama3 LLM class"""
 
-    def __init__(self, config: LLama3LLMConfig):
-        self.llm = self.get_llm(config)
-
-    @staticmethod
-    def get_llm(config: LLama3LLMConfig) -> ChatOpenAI:
+    def get_llm_instance(self, config: BaseLLMConfig) -> ChatOpenAI:
         """Static method, will return a LLama3 LLM instance according to the configuration provided
 
         Args:
@@ -84,13 +98,20 @@ class LLama3LLM:
         Returns:
             ChatOpenAI: A llama3 llm instance defined in langchain_openai
         """
-        return ChatOpenAI(
-            base_url=config.endpoint,
-            api_key=config.api_key,
-            model=config.llm_source + "/" + config.model,
-            temperature=config.temperature,
-            max_tokens=config.max_tokens,
-        )
+        if not isinstance(config, LLama3LLMConfig):
+            raise TypeError(f"Expected LLama3LLMConfig, got {type(config)}")
+
+        try:
+            return ChatOpenAI(
+                base_url=config.endpoint,
+                api_key=config.api_key,
+                model=config.llm_source + "/" + config.model,
+                temperature=config.temperature,
+                max_tokens=config.max_tokens,
+            )
+        except Exception as e:
+            logger.error(f"Failed to creat LLama3 LLM instance: {e}")
+            raise e
 
 
 class LLMProxy:
@@ -98,15 +119,29 @@ class LLMProxy:
     A Proxy class to interact with the supported LLMs
     """
 
-    def __init__(self, config: AzureLLMConfig | PerplexityLLMConfig | LLama3LLMConfig) -> None:
-        if config.llm_source == "azure":
-            self.llm = AzureLLM(config).llm
-        elif config.llm_source == "perplexity":
-            self.llm = PerplexityLLM(config).llm
-        elif config.llm_source == "meta":
-            self.llm = LLama3LLM(config).llm
-        else:
-            raise ValueError("Only [Azure, Perplexity, LLama3] LLM supported now!")
+    def __init__(self, llm: ChatOpenAI) -> None:
+        self.llm = llm
+
+    @staticmethod
+    def create_llm_proxy(config: BaseLLMConfig) -> "LLMProxy":
+        """
+        Factory method to create a LLMProxy instance
+        """
+        llm_class: Type[BaseLLM] = {
+            "azure": AzureLLM,
+            "perplexity": PerplexityLLM,
+            "meta": LLama3LLM,
+        }.get(config.llm_source, None)
+
+        if llm_class is None:
+            raise ValueError(
+                f"Unsupported LLM source: {config.llm_source}, only [Azure, Perplexity, LLama3] supported now!"
+            )
+
+        llm_instance = llm_class().get_llm_instance(config)
+
+        # return the LLMProxy instance, will call the init method here, and pass the llm_instance
+        return LLMProxy(llm_instance)
 
     def get_response_from_llm(self, question: Any, verbose: bool = False):
         """method to get response from LLM

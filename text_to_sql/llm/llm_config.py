@@ -1,5 +1,6 @@
 """Set up the LLM configurations using pydantic."""
 
+import os
 from typing import Literal, Optional
 
 from pydantic import BaseSettings, Field, SecretStr
@@ -26,7 +27,8 @@ class BaseLLMConfig(BaseSettings):
     class Config:
         """Config for pydantic class"""
 
-        env_path = "../config/.env"
+        current_dir = os.path.dirname(__file__)
+        env_file = os.path.join(current_dir, "../config/.env")
         env_file_encoding = "utf-8"
 
 
@@ -48,9 +50,9 @@ class AzureLLMConfig(BaseLLMConfig):
 class PerplexityLLMConfig(BaseLLMConfig):
     """The Perplexity LLM configurations class, mapped from .env file"""
 
-    model: Literal[
-        "sonar-small-chat", "sonar-medium-chat", "mistral-7b-instruct", "mistral-8x7b-instruct"
-    ] = "sonar-small-chat"
+    model: Literal["sonar-small-chat", "sonar-medium-chat", "mistral-7b-instruct", "mistral-8x7b-instruct"] = (
+        "sonar-small-chat"
+    )
     llm_source: str = "perplexity"
 
     class Config:
@@ -63,7 +65,7 @@ class PerplexityLLMConfig(BaseLLMConfig):
 class LLama3LLMConfig(BaseLLMConfig):
     """The LLama3 LLM configurations class, mapped from .env file"""
 
-    model: Literal["llama3-70b"] = "llama3-70b"
+    model: Literal["llama3-70b-instruct"] = "llama3-70b-instruct"
     llm_source: str = "meta"
 
     class Config:
