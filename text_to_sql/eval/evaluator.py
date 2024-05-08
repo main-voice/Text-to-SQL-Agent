@@ -98,7 +98,6 @@ class Evaluator:
         db_config: Optional[DBConfig] = None,
         model_type: str = "azure",
         model: str = "gpt-35-turbo",
-        output_prefix: str = "eval_output",
         parallel_threads: int = 3,
         eval_method: Literal["agent", "langchain", "simple"] = "agent",
         verbose: bool = False,
@@ -111,7 +110,6 @@ class Evaluator:
             db_config (Optional[DBConfig], optional): The database config for connecting database. Defaults to None.
             model_type (str, optional): Type of LLM to be used to evaluate. Defaults to "azure".
             model (str, optional): Model name of llm used. Defaults to "gpt-3.5".
-            output_prefix (str, optional): Prefix path to the output evaluation result. Defaults to "eval_output".
             parallel_threads (int, optional): How many thread can be evaluated at the same time. Defaults to 3.
             verbose (bool, optional): If logging info during evaluation. Defaults to False.
 
@@ -152,7 +150,7 @@ class Evaluator:
 
         self.llm_config: BaseLLMConfig = self.create_llm_config()
 
-        self.output_prefix = output_prefix
+        self.output_folder = "eval_results"
         self.parallel_threads = parallel_threads
         self.verbose = verbose
         self.eval_method = eval_method
@@ -395,8 +393,6 @@ class Evaluator:
 
             self.eval_results.append(result_item)
 
-        self.save_output(eval_result=self.eval_results)
-
         return self.eval_results
 
     def check_query_correctness(self, result_item: EvalResultItem) -> EvalResultItem:
@@ -438,7 +434,7 @@ class Evaluator:
         # execute the generated query
         try:
             my_result = self.query_db(generated_query, db_name)
-            logger.info(f"My SQL result: {my_result}")
+            logger.debug(f"My SQL result: {my_result}")
 
             for acceptable_query in acceptable_sub_queries:
                 acceptable_result = self.query_db(acceptable_query, db_name)
@@ -561,21 +557,22 @@ class Evaluator:
         sorted_df = sorted_df.reset_index(drop=True)
         return sorted_df
 
-    def save_output(self, eval_result: List[EvalResultItem] = None) -> str:
+    def save_output(
+        self, eval_type: Literal["smoke", "prod"] = "smoke", eval_result: List[EvalResultItem] = None
+    ) -> str:
         """Save the evaluation output to a JSON file.
 
         Args:
+            eval_type (Literal["smoke", "prod"], optional): The evaluation type. Defaults to "smoke".
             eval_result (List[EvalResultItem]): the evaluation result to be saved, if not provided
 
         Returns:
             str: path to the saved file, will connect the prefix with the current time
         """
-        save_folder = Path(__file__).parent / "eval_results" / self.model_type
+        save_folder = Path(__file__).parent / self.output_folder / self.model_type
         save_folder.mkdir(parents=True, exist_ok=True)
 
-        save_path = (
-            f"{self.output_prefix}_{self.eval_method}_{self.model}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-        )
+        save_path = f"{eval_type}_{self.eval_method}_{self.model}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
         save_path = save_folder / save_path
 
         # save the evaluation result to a json file
@@ -690,6 +687,13 @@ if __name__ == "__main__":
     # arg_parser.add_argument("--parallel_threads", type=int, default=3, help="Number of parallel threads.")
     arg_parser.add_argument("--eval_method", type=str, help="Evaluation method.")
 
+    arg_parser.add_argument(
+        "--eval_type",
+        type=str,
+        choices=["smoke", "prod"],
+        help="Evaluation type. smoke for quick test evaluation, prod for full evaluation.",
+    )
+
     sentry_sdk.init(
         dsn=settings.SENTRY_DSN.get_secret_value(),
         environment=settings.ENVIRONMENT,
@@ -724,7 +728,8 @@ if __name__ == "__main__":
     )
     try:
         results = evaluator.eval()
+        evaluator.save_output(args.eval_type, results)
     except Exception as e:  # pylint: disable=broad-except
         logger.error(f"Error in evaluating the generated SQL queries: {e}")
         capture_exception(e)
-        evaluator.save_output()
+        evaluator.save_output(args.eval_type)

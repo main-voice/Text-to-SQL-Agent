@@ -1,5 +1,29 @@
 {
   "version": "0.2.0",
+  "compounds": [
+    {
+      "name": "Smoke Test Eval",
+      "configurations": [
+        "Smoke Test - Eval Agent with Azure gpt-35-turbo",
+        "Smoke Test - Eval Agent with LLama3 70b",
+        "Smoke Test - Eval Simple Agent with LLama3 70b",
+        "Smoke Test - Eval Simple Agent using Azure gpt-35-turbo",
+        "Smoke Test - Eval Langchain Agent with LLama3 70b",
+        "Smoke Test - Eval Langchain Agent with Azure gpt-35-turbo"
+      ]
+    },
+    {
+      "name": "Prod Eval",
+      "configurations": [
+        "Prod: Eval Agent using Azure gpt-35-turbo",
+        "Prod: Eval Agent using LLama3 70b",
+        "Prod: Eval Simple Agent using Azure gpt-35-turbo",
+        "Prod: Eval Simple Agent using LLama3 70b",
+        "Prod: Eval Langchain using Azure gpt-35-turbo",
+        "Prod: Eval Langchain Agent using LLama3 70b"
+      ]
+    }
+  ],
   "configurations": [
     {
       "name": "Debugger Current File",
@@ -12,27 +36,6 @@
         "PYTHONPATH": "${workspaceFolder}"
       },
       "justMyCode": false
-    },
-    {
-      "name": "Eval Simple Agent using LLama3 - Smoke Test",
-      "type": "debugpy",
-      "request": "launch",
-      "program": "${workspaceFolder}/text_to_sql/eval/evaluator.py",
-      "console": "integratedTerminal",
-      "args": [
-        "--model_type",
-        "llama3",
-        "--model",
-        "llama3-70b-instruct",
-        "--eval_method",
-        "simple",
-        "--num_quesions",
-        "1"
-      ],
-      "cwd": "${workspaceFolder}",
-      "env": {
-        "PYTHONPATH": "${workspaceFolder}"
-      }
     },
     {
       "name": "Smoke Test - Eval Simple Agent using Azure gpt-35-turbo",
@@ -48,7 +51,9 @@
         "--eval_method",
         "simple",
         "--num_questions",
-        "1"
+        "2",
+        "--eval_type",
+        "smoke"
       ],
       "cwd": "${workspaceFolder}",
       "env": {
@@ -69,7 +74,9 @@
         "--eval_method",
         "langchain",
         "--num_questions",
-        "2"
+        "2",
+        "--eval_type",
+        "smoke"
       ],
       "cwd": "${workspaceFolder}",
       "env": {
@@ -77,7 +84,7 @@
       }
     },
     {
-      "name": "Smoke Test - Eval Tools Agent with Azure gpt-35-turbo",
+      "name": "Smoke Test - Eval Agent with Azure gpt-35-turbo",
       "type": "debugpy",
       "request": "launch",
       "program": "${workspaceFolder}/text_to_sql/eval/evaluator.py",
@@ -90,7 +97,9 @@
         "--eval_method",
         "agent",
         "--num_questions",
-        "2"
+        "2",
+        "--eval_type",
+        "smoke"
       ],
       "cwd": "${workspaceFolder}",
       "env": {
@@ -111,7 +120,9 @@
         "--eval_method",
         "simple",
         "--num_questions",
-        "2"
+        "2",
+        "--eval_type",
+        "smoke"
       ],
       "cwd": "${workspaceFolder}",
       "env": {
@@ -132,7 +143,9 @@
         "--eval_method",
         "langchain",
         "--num_questions",
-        "2"
+        "2",
+        "--eval_type",
+        "smoke"
       ],
       "cwd": "${workspaceFolder}",
       "env": {
@@ -153,7 +166,9 @@
         "--eval_method",
         "agent",
         "--num_questions",
-        "2"
+        "2",
+        "--eval_type",
+        "smoke"
       ],
       "cwd": "${workspaceFolder}",
       "env": {
@@ -174,7 +189,9 @@
         "--eval_method",
         "simple",
         "--num_questions",
-        "250"
+        "250",
+        "--eval_type",
+        "prod"
       ],
       "cwd": "${workspaceFolder}",
       "env": {
@@ -195,7 +212,9 @@
         "--eval_method",
         "langchain",
         "--num_questions",
-        "250"
+        "250",
+        "--eval_type",
+        "prod"
       ],
       "cwd": "${workspaceFolder}",
       "env": {
@@ -216,7 +235,9 @@
         "--eval_method",
         "agent",
         "--num_questions",
-        "250"
+        "250",
+        "--eval_type",
+        "prod"
       ],
       "cwd": "${workspaceFolder}",
       "env": {
@@ -237,7 +258,9 @@
         "--eval_method",
         "agent",
         "--num_questions",
-        "250"
+        "250",
+        "--eval_type",
+        "prod"
       ],
       "cwd": "${workspaceFolder}",
       "env": {
@@ -258,7 +281,9 @@
         "--eval_method",
         "simple",
         "--num_questions",
-        "250"
+        "250",
+        "--eval_type",
+        "prod"
       ],
       "cwd": "${workspaceFolder}",
       "env": {
@@ -279,7 +304,9 @@
         "--eval_method",
         "langchain",
         "--num_questions",
-        "250"
+        "250",
+        "--eval_type",
+        "prod"
       ],
       "cwd": "${workspaceFolder}",
       "env": {
