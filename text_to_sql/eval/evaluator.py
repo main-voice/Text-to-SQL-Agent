@@ -4,6 +4,7 @@ import argparse
 import itertools
 import json
 import re
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import List, Literal, Optional
@@ -350,12 +351,16 @@ class Evaluator:
             # we can use different methods to generate the SQL query, including the agent, langchain, or simple agent
             # In evaluation, we will return all token usage information
 
+            # record the time for evaluation
+            start_time = time.time()
             sql_generator_response: SQLGeneratorResponse = self.sql_generator.generate_sql(
                 user_query=eval_item.question,
                 instructions=eval_item.instructions,
                 single_line_format=True,
                 verbose=self.verbose,
             )
+            end_time = time.time()
+            eval_duration_time = round(end_time - start_time, 2)
 
             sql_hardness = self.eval_sql_hardness(eval_item.golden_query)
             result_item = EvalResultItem(
@@ -367,6 +372,7 @@ class Evaluator:
                 generated_query=sql_generator_response.generated_sql,
                 token_usage=sql_generator_response.token_usage,
                 hardness=sql_hardness,
+                eval_duration=eval_duration_time,
             )
 
             if not sql_generator_response.generated_sql or sql_generator_response.error:
