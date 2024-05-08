@@ -40,3 +40,4 @@ class EvalResultItem(BaseModel):
     token_usage: int = Field(default=-1)
     is_correct: Optional[bool] = Field(default=False)
     exec_correct: Optional[bool] = Field(default=False)
+    eval_duration: Optional[float] = Field(default=None)
