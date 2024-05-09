@@ -33,7 +33,7 @@ class EvalResultItem(BaseModel):
     query_category: str
     instructions: Optional[str] = Field(default=None)
 
-    golden_query: str = Field(alias="query")
+    golden_query: str
     hardness: SQLHardness = Field(default=None)
     generated_query: str = Field(default=None)
 

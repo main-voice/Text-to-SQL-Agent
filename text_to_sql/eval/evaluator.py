@@ -5,7 +5,6 @@ import itertools
 import json
 import re
 import time
-from datetime import datetime
 from pathlib import Path
 from typing import List, Literal, Optional
 
@@ -93,8 +92,6 @@ class Evaluator:
     def __init__(
         self,
         dataset_path: str | Path,
-        num_questions: int = 10,
-        start_index: int = 0,
         db_config: Optional[DBConfig] = None,
         model_type: str = "azure",
         model: str = "gpt-35-turbo",
@@ -119,21 +116,6 @@ class Evaluator:
         """
 
         self.loader = Loader(dataset_path=dataset_path)
-
-        assert num_questions > 0, "Number of questions should be greater than 0."
-        max_num_questions = self.loader.total_eval_items()
-
-        if num_questions > max_num_questions:
-            logger.warning(
-                f"Number of questions provided {num_questions} is greater than the maximum number \
-            of questions allowed {max_num_questions}, will be using the maximum number of questions allowed."
-            )
-            num_questions = max_num_questions
-        self.num_questions = num_questions
-
-        if start_index < 0 or start_index >= max_num_questions:
-            raise ValueError(f"Start index {start_index} is out of the range of the dataset.")
-        self.start_index = start_index
 
         if not db_config:
             raise ValueError("Database configuration is missing, please provide one at least.")
@@ -170,7 +152,10 @@ class Evaluator:
 
         if self.model_type == "azure":
             logger.info("Creating Azure LLM Config for Evaluation...")
-            self.llm_config = AzureLLMConfig(model=self.model)
+            if "gpt-4" in self.model:
+                self.llm_config = AzureLLMConfig(model=self.model, deployment_name="gpt-4-turbo")
+            else:
+                self.llm_config = AzureLLMConfig(model=self.model, deployment_name="gpt-35-turbo")
         elif self.model_type == "llama3":
             logger.info("Creating Llama3 LLM Config for Evaluation...")
             self.llm_config = LLama3LLMConfig(model=self.model)
@@ -331,69 +316,136 @@ class Evaluator:
         count_agg = len(re.findall(r"\b(COUNT|SUM|AVG|MIN|MAX)\b", sql, re.IGNORECASE))
         return count_agg
 
-    def eval(self) -> List[EvalResultItem]:
-        """Evaluate the generated SQL queries against the ground truth queries."""
+    def load_previous_eval_results(self, previous_eval_file: str) -> List[EvalResultItem]:
+        """Load previous evaluation results from file.
+
+        Args:
+            previous_eval_file (str): Path to the previous evaluation result file.
+        """
+        previous_eval_file = Path(__file__).parent / Path(self.output_folder) / Path(previous_eval_file)
+        if not previous_eval_file.exists():
+            logger.warning(f"Previous evaluation file {previous_eval_file} does not exist.")
+            return []
+
+        # load the previous evaluation results from the JSON file
+        with open(previous_eval_file, "r", encoding="utf-8") as f:
+            eval_results = json.load(f)
+
+        pre_eval_results = [EvalResultItem.parse_obj(item) for item in eval_results]
+        logger.info(f"Loaded {len(pre_eval_results)} previous evaluation results from {previous_eval_file}.")
+        return pre_eval_results
+
+    def eval(
+        self, num_questions: int = 10, start_index: int = 0, previous_eval_file: Optional[str] = None
+    ) -> List[EvalResultItem]:
+        """Evaluate the generated SQL queries against the ground truth queries.
+
+        Args:
+            num_questions (int, optional): Number of questions to evaluate. Defaults to 10.
+            start_index (int, optional): Start index of the questions to evaluate. Defaults to 0.
+            previous_eval_file (Optional[str], optional): Path to the previous evaluation result file.
+                                                        If provided, will do incremental evaluation. Defaults to None.
+
+        Returns:
+            List[EvalResultItem]: The evaluated result items.
+        """
+
+        if previous_eval_file:
+            pre_eval_results = self.load_previous_eval_results(previous_eval_file)
+
+        max_num_questions = self.loader.total_eval_items()
+        if start_index < 0 or start_index >= max_num_questions:
+            raise ValueError(f"Start index {start_index} is out of the range of the dataset.")
+
+        if num_questions + start_index > max_num_questions:
+            logger.warning(
+                f"Number of questions {num_questions} is bigger than the maximum questions allowed {max_num_questions},\
+                  will be using the maximum number of questions allowed."
+            )
+            num_questions = max_num_questions - start_index
 
         # first we have a dataframe with the questions and the ground truth queries
-        eval_items: List[EvalItem] = self.loader.load_eval_items(
-            max_rows=self.num_questions, start_index=self.start_index
-        )
-        logger.info(f"Loaded {len(eval_items)} evaluation items starting from index {self.start_index}.")
+        eval_items: List[EvalItem] = self.loader.load_eval_items(max_rows=num_questions, start_index=start_index)
+        logger.info(f"Loaded {len(eval_items)} evaluation items starting from index {start_index}.")
         self.eval_results = []
 
         for eval_item in tqdm(eval_items, desc="Evaluating...", total=len(eval_items)):
+            if previous_eval_file:
+                # Check if the current eval_item exists in previous results
+                previous_result = next(
+                    (
+                        item
+                        for item in pre_eval_results
+                        if item.question == eval_item.question and item.db_name == eval_item.db_name
+                    ),
+                    None,
+                )
+                if previous_result and previous_result.is_correct:
+                    # If the previous result is correct, skip evaluation
+                    logger.info(f"Skip evaluation: Question: {eval_item.question} is already correct.")
+                    self.eval_results.append(previous_result)
+                    continue
+
             logger.info(f"Start evaluating question: {eval_item.question}, the database is {eval_item.db_name}...")
 
-            self.create_sql_generator(db_name=eval_item.db_name)
-
-            # we can use different methods to generate the SQL query, including the agent, langchain, or simple agent
-            # In evaluation, we will return all token usage information
-
-            # record the time for evaluation
-            start_time = time.time()
-            sql_generator_response: SQLGeneratorResponse = self.sql_generator.generate_sql(
-                user_query=eval_item.question,
-                instructions=eval_item.instructions,
-                single_line_format=True,
-                verbose=self.verbose,
-            )
-            end_time = time.time()
-            eval_duration_time = round(end_time - start_time, 2)
-
-            sql_hardness = self.eval_sql_hardness(eval_item.golden_query)
-            result_item = EvalResultItem(
-                question=eval_item.question,
-                query=eval_item.golden_query,
-                db_name=eval_item.db_name,
-                query_category=eval_item.query_category,
-                instructions=eval_item.instructions,
-                generated_query=sql_generator_response.generated_sql,
-                token_usage=sql_generator_response.token_usage,
-                hardness=sql_hardness,
-                eval_duration=eval_duration_time,
-            )
-
-            if not sql_generator_response.generated_sql or sql_generator_response.error:
-                logger.error(
-                    f"Failed to generate query for question: {eval_item.question},\
-                    the error is {sql_generator_response.error}."
-                )
-                self.eval_results.append(result_item)
-                continue
-
-            logger.info(f"Generated query: {sql_generator_response.generated_sql}.")
-
-            logger.info("Evaluating the correctness of the generated query...")
-            self.check_query_correctness(result_item)
-
-            if result_item.is_correct:
-                logger.info("The generated query is correct.")
-            else:
-                logger.error("The generated query is incorrect.")
-
-            self.eval_results.append(result_item)
+            item_eval_result = self.eval_single_item(eval_item)
+            self.eval_results.append(item_eval_result)
 
         return self.eval_results
+
+    def eval_single_item(self, eval_item: EvalItem | EvalResultItem) -> EvalResultItem:
+        """Evaluate a single evaluation item.
+
+        Args:
+            eval_item (EvalItem | EvalResultItem): The evaluation item to evaluate.
+
+        Returns:
+            EvalResultItem: The evaluation result for the given eval_item.
+        """
+        self.create_sql_generator(db_name=eval_item.db_name)
+
+        # record the time for evaluation
+        start_time = time.time()
+        sql_generator_response: SQLGeneratorResponse = self.sql_generator.generate_sql(
+            user_query=eval_item.question,
+            instructions=eval_item.instructions,
+            single_line_format=True,
+            verbose=self.verbose,
+        )
+        end_time = time.time()
+        eval_duration_time = round(end_time - start_time, 2)
+
+        sql_hardness = self.eval_sql_hardness(eval_item.golden_query)
+        result_item = EvalResultItem(
+            question=eval_item.question,
+            golden_query=eval_item.golden_query,
+            db_name=eval_item.db_name,
+            query_category=eval_item.query_category,
+            instructions=eval_item.instructions,
+            generated_query=sql_generator_response.generated_sql,
+            token_usage=sql_generator_response.token_usage,
+            hardness=sql_hardness,
+            eval_duration=eval_duration_time,
+        )
+
+        if not sql_generator_response.generated_sql or sql_generator_response.error:
+            logger.error(
+                f"Failed to generate query for question: {eval_item.question},\
+                the error is {sql_generator_response.error}."
+            )
+            return result_item
+
+        logger.info(f"Generated query: {sql_generator_response.generated_sql}.")
+
+        logger.info("Evaluating the correctness of the generated query...")
+        self.check_query_correctness(result_item)
+
+        if result_item.is_correct:
+            logger.info("The generated query is correct.")
+        else:
+            logger.error("The generated query is incorrect.")
+
+        return result_item
 
     def check_query_correctness(self, result_item: EvalResultItem) -> EvalResultItem:
         """Check the correctness of the generated query with the golden queries. Will check the execution correctness.
@@ -569,10 +621,14 @@ class Evaluator:
         Returns:
             str: path to the saved file, will connect the prefix with the current time
         """
+        if not eval_result:
+            return ""
         save_folder = Path(__file__).parent / self.output_folder / self.model_type
         save_folder.mkdir(parents=True, exist_ok=True)
 
-        save_path = f"{eval_type}_{self.eval_method}_{self.model}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        # TODO: add time to the file name when the evaluation is stable
+        # save_path = f"{eval_type}_{self.eval_method}_{self.model}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        save_path = f"{eval_type}_{self.eval_method}_{self.model}.json"
         save_path = save_folder / save_path
 
         # save the evaluation result to a json file
@@ -679,13 +735,21 @@ if __name__ == "__main__":
     arg_parser.add_argument("--db_type", type=str, default="postgres", help="Type of the database.")
 
     # llm related arguments
-    arg_parser.add_argument("--model_type", type=str, help="Type of the LLM model.")
+    arg_parser.add_argument("--model_type", type=str, help="Type of the LLM model.", choices=["azure", "llama3"])
     arg_parser.add_argument("--model", type=str, help="Model name of the LLM.")
 
     # evaluation related arguments
     arg_parser.add_argument("--output_prefix", type=str, default="eval_output", help="Prefix path to the output file.")
     # arg_parser.add_argument("--parallel_threads", type=int, default=3, help="Number of parallel threads.")
-    arg_parser.add_argument("--eval_method", type=str, help="Evaluation method.")
+    arg_parser.add_argument(
+        "--eval_method", type=str, help="Evaluation method.", choices=["agent", "langchain", "simple"]
+    )
+    arg_parser.add_argument(
+        "--pre_eval_result_file",
+        type=str,
+        default="",
+        help="[Optional] Path to an existing evaluation result file, will update the existing file.",
+    )
 
     arg_parser.add_argument(
         "--eval_type",
@@ -721,13 +785,13 @@ if __name__ == "__main__":
         model_type=args.model_type,
         model=args.model,
         dataset_path=args.dataset_path,
-        num_questions=args.num_questions,
-        start_index=args.start_index,
         verbose=True,
         eval_method=args.eval_method,
     )
     try:
-        results = evaluator.eval()
+        results = evaluator.eval(
+            num_questions=args.num_questions, start_index=args.start_index, previous_eval_file=args.pre_eval_result_file
+        )
         evaluator.save_output(args.eval_type, results)
     except Exception as e:  # pylint: disable=broad-except
         logger.error(f"Error in evaluating the generated SQL queries: {e}")

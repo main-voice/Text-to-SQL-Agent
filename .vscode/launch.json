@@ -53,8 +53,11 @@
         "--num_questions",
         "2",
         "--eval_type",
-        "smoke"
+        "smoke",
+        "--pre_eval_result_file",
+        "azure/smoke_simple_gpt-35-turbo.json"
       ],
+      "justMyCode": false,
       "cwd": "${workspaceFolder}",
       "env": {
         "PYTHONPATH": "${workspaceFolder}"
@@ -191,7 +194,9 @@
         "--num_questions",
         "250",
         "--eval_type",
-        "prod"
+        "prod",
+        "--pre_eval_result_file",
+        "llama3/prod_simple_llama3-70b-instruct.json"
       ],
       "cwd": "${workspaceFolder}",
       "env": {
@@ -283,7 +288,34 @@
         "--num_questions",
         "250",
         "--eval_type",
-        "prod"
+        "prod",
+        "--pre_eval_result_file",
+        "azure/prod_simple_gpt-35-turbo.json"
+      ],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      }
+    },
+    {
+      "name": "Prod: Eval Simple Agent using Azure 4",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/text_to_sql/eval/evaluator.py",
+      "console": "integratedTerminal",
+      "args": [
+        "--model_type",
+        "azure",
+        "--model",
+        "gpt-4",
+        "--eval_method",
+        "simple",
+        "--num_questions",
+        "250",
+        "--eval_type",
+        "prod",
+        "--pre_eval_result_file",
+        "azure/prod_simple_gpt-4-turbo.json"
       ],
       "cwd": "${workspaceFolder}",
       "env": {
