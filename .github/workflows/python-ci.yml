@@ -2,14 +2,13 @@ name: Python CI
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main", "dev" ]
-
+    branches: ["main", "dev"]
 
 permissions:
   contents: read
-  
+
 jobs:
   build-and-lint:
     runs-on: ubuntu-latest
@@ -30,6 +29,7 @@ jobs:
           fi
       - name: Lint with flake8
         run: |
+          cd text_to_sql
           # stop the build if there are Python syntax errors or undefined names
           flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
           # exit-zero treats all errors as warnings.
@@ -39,5 +39,4 @@ jobs:
       #     pylint text_to_sql/**/*.py --rcfile=.linting/.pylintrc
       - name: Test with pytest
         run: |
-          pytest tests/test_db_config.py
-      
+          pytest tests/test_db_config.py tests/test_llm_config.py

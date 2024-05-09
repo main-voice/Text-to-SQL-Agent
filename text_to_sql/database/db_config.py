@@ -1,5 +1,7 @@
 """Configuration class for the database connection"""
 
+import os
+
 from pydantic import BaseSettings, Field
 
 
@@ -23,7 +25,8 @@ class DBConfig(BaseSettings):
     class Config:
         """Config for pydantic class"""
 
-        env_path = "../config/.env"
+        current_dir = os.path.dirname(__file__)
+        env_file = os.path.join(current_dir, "../config/.env")
         env_file_encoding = "utf-8"
 
 

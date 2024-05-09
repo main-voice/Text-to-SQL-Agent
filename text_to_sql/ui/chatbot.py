@@ -5,6 +5,7 @@ The entry point for the text-to-SQL chatbot demo.
 
 import gradio as gr
 
+from text_to_sql.config.settings import settings
 from text_to_sql.llm.embedding_proxy import EmbeddingProxy
 from text_to_sql.sql_generator.sql_generate_agent import SQLGeneratorAgent
 from text_to_sql.utils.logger import get_logger
@@ -17,7 +18,9 @@ class SQLChatbot:
     A chatbot which wrapper sql agent and gradio interface
     """
 
-    def __init__(self, llm_config=None, db_config=None, title=None, description=None, examples=None, top_k=5):
+    def __init__(
+        self, llm_config=None, db_config=None, title=None, description=None, examples=None, top_k=settings.TOP_K
+    ):
         self.agent = SQLGeneratorAgent(
             llm_config=llm_config, embedding_proxy=EmbeddingProxy(), db_config=db_config, top_k=top_k
         )
@@ -43,6 +46,6 @@ class SQLChatbot:
         return demo
 
     def chatbot_response(self, message, history):  # pylint: disable=unused-argument
-        response = self.agent.generate_sql_with_agent(message)
+        response = self.agent.generate_sql(message)
         logger.info(f"\nChatbot response: {response}")
-        return response
+        return str(response)

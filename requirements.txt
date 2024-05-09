@@ -13,3 +13,4 @@ numpy
 deprecated
 gradio
 requests
+sqlparse

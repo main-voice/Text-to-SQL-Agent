@@ -5,6 +5,7 @@ Tools are interfaces that an agent can use to interact with the world.
 For details: ref to "https://python.langchain.com/docs/modules/agents/tools/"
 """
 
+import re
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Union
 
@@ -318,8 +319,6 @@ class CurrentTimeTool(BaseSQLAgentTool, BaseTool):
 
     def _run(
         self,
-        # input_string: Optional[str] = None,
-        run_manager: Optional[CallbackManagerForToolRun] = None,  # pylint: disable=unused-argument
         *args: Any,
         **kwargs: Any,
     ) -> Any:
@@ -367,7 +366,7 @@ class ValidateSQLCorrectness(BaseSQLAgentTool, BaseTool):
     description = """
     Input: an SQL wrapper in ```sql and ``` tags.
     Output: result from database engine or any error message raised during executing the sql
-    Function: Use this tool to execute the SQL query
+    Function: Use this tool to validate the SQL query correctness before you return the sql to the user.
     """
 
     def _run(
@@ -376,20 +375,38 @@ class ValidateSQLCorrectness(BaseSQLAgentTool, BaseTool):
         run_manager: Optional[CallbackManagerForToolRun] = None,  # pylint: disable=unused-argument
         *args: Any,
         **kwargs: Any,
-    ) -> str:
-        sql_query = sql_query.strip().replace(r"\_", "_")
-        if "```sql" in sql_query:
-            sql_query = sql_query.replace("```sql", "").replace("```", "").strip()
-
+    ) -> str | pd.DataFrame:
         logger.info(f"The Agent is calling tool: {self.name}. Input SQL query: {sql_query}.")
 
+        sql_query = sql_query.strip().replace(r"\_", "_")
+        sql_start_tag = "```sql"
+        sql_end_tag = "```"
+        extract_sql_pattern = rf"({sql_start_tag}.*?{sql_end_tag})"
+
+        extracted_sqls: list = re.findall(extract_sql_pattern, sql_query, re.DOTALL)
+
+        if not extracted_sqls:
+            logger.error("Failed to extract SQL statement from validation tools input.")
+            return "Failed to extract SQL statement from input, make sure you wrapper the sql with ```sql and ``` tags."
+
+        if len(extracted_sqls) > 1:
+            logger.warning("Multiple SQL statements found in LLM response. Using the first one.")
+
+        sql_query = extracted_sqls[0]
+        # remove the sql start and end tags
+        sql_query = sql_query.replace(sql_start_tag, "").replace(sql_end_tag, "").strip()
+
+        if "Observation" in sql_query:
+            sql_query = sql_query.split("Observation:")[0]
+            sql_query = sql_query.strip()
+
         try:
-            result = self.db_manager.db_engine.execute(statement=sql_query)
+            result = self.db_manager.db_engine.execute(statement=sql_query, is_pd=True)
         except Exception as e:
             logger.error(f"ERROR raised during executing the SQL query: {sql_query}. Error message: {str(e)}")
-            return "ERROR" + str(e)
+            return "ERROR: " + str(e)
 
-        return str(result).strip()
+        return result
 
 
 class SQLAgentToolkits(BaseToolkit):

@@ -1,5 +1,7 @@
 import unittest
 
+import pandas as pd
+
 from text_to_sql.database.db_config import MySQLConfig
 from text_to_sql.database.db_engine import MySQLEngine
 from text_to_sql.database.db_metadata_manager import DBMetadataManager
@@ -96,17 +98,20 @@ class TestAgentSQLTools(unittest.TestCase):
         # normal usage
         validate_tool = ValidateSQLCorrectness(db_manager=self.db_metadata_manager)
         test_sql = "SELECT username FROM jk_user where username like '%bao%'"
-        result = validate_tool._run(test_sql)
-        self.assertTrue("baokker" in result.lower())
 
         test_sql_markdown = "```sql" + test_sql + "```"
         result = validate_tool._run(test_sql_markdown)
+        if isinstance(result, pd.DataFrame):
+            result = result.to_string()
+
         self.assertTrue("baokker" in result.lower())
 
         # non select sql
-        test_sql = "insert into jk_user (username) values (test)"
+        test_sql = "```sql insert into jk_user (username) values (test)```"
         result = validate_tool._run(test_sql)
-        # print(result)
+        if isinstance(result, pd.DataFrame):
+            result = result.to_string()
+        print(result)
         self.assertTrue("error" in result.lower())
 
 

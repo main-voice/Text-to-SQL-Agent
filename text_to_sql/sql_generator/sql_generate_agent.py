@@ -3,18 +3,23 @@ The main SQLGeneratorAgent class is responsible for generating SQL statements us
 """
 
 import re
-from typing import Any, List, Tuple
+from abc import ABC, abstractmethod
+from typing import List, Tuple
 
 import openai
-from deprecated import deprecated
+import sqlparse
 from langchain.agents import AgentExecutor, ZeroShotAgent
 from langchain.chains.llm import LLMChain
+from langchain.chains.sql_database.query import create_sql_query_chain
 
 # pylint: disable=no-name-in-module
 from langchain_community.callbacks import get_openai_callback
+from langchain_community.utilities.sql_database import SQLDatabase
 from langchain_core.agents import AgentAction
+from langchain_core.messages import BaseMessage
 from sqlalchemy.exc import SQLAlchemyError
 
+from text_to_sql.config.settings import settings
 from text_to_sql.database.db_config import DBConfig, MySQLConfig, PostgreSQLConfig
 from text_to_sql.database.db_engine import MySQLEngine, PostgreSQLEngine
 from text_to_sql.database.db_metadata_manager import DBMetadataManager
@@ -22,155 +27,63 @@ from text_to_sql.llm.embedding_proxy import EmbeddingProxy
 from text_to_sql.llm.llm_config import AzureLLMConfig, BaseLLMConfig
 from text_to_sql.llm.llm_proxy import LLMProxy
 from text_to_sql.sql_generator.sql_agent_tools import SQLAgentToolkits
+from text_to_sql.sql_generator.sql_generate_response import SQLGeneratorResponse
 from text_to_sql.utils import is_contain_chinese
 from text_to_sql.utils.logger import get_logger
 from text_to_sql.utils.prompt import (
-    DB_INTRO,
     ERROR_PARSING_MESSAGE,
     FORMAT_INSTRUCTIONS,
+    PLAN_WITH_INSTUCTIONS_AND_VALIDATION,
     PLAN_WITH_VALIDATION,
+    SIMPLE_PROMPT,
     SQL_AGENT_PREFIX,
     SQL_AGENT_SUFFIX,
-    SYSTEM_CONSTRAINTS,
-    SYSTEM_PROMPT_DEPRECATED,
 )
 from text_to_sql.utils.translator import LLMTranslator, YoudaoTranslator
 
 logger = get_logger(__name__)
 
+SQL_START_TAG = "```sql"
+SQL_END_TAG = "```"
+SUPPORTED_QUERYS = ["select"]
 
-class SQLGeneratorAgent:
-    """
-    A LLM Agent that generates SQL using user input and table metadata
-    """
+MAX_INPUT_LENGTH = settings.MAX_INPUT_LENGTH
 
-    max_input_size: int = 200
 
-    def __init__(
-        self,
-        llm_config: BaseLLMConfig = None,
-        embedding_proxy: EmbeddingProxy = None,
-        db_config: DBConfig = None,
-        top_k=5,
-        verbose=True,
-    ):
-        # set database metadata manager
-        if db_config is None:
-            # by default, we use MySQL database
-            self.db_config = MySQLConfig()
-            self.db_metadata_manager = DBMetadataManager(MySQLEngine(MySQLConfig()))
-        else:
-            self.db_config = db_config
-            if isinstance(db_config, MySQLConfig):
-                self.db_metadata_manager = DBMetadataManager(MySQLEngine(db_config))
-            elif isinstance(db_config, PostgreSQLConfig):
-                self.db_metadata_manager = DBMetadataManager(PostgreSQLEngine(db_config))
+class BaseSQLGeneratorAgent(ABC):
+    """Base class for SQLGeneratorAgent"""
 
-        if llm_config is None:
-            # If llm_config is None, we will use the default LLM which is Azure LLM
-            self.llm_config = AzureLLMConfig()
-        else:
-            self.llm_config = llm_config
+    llm_config: BaseLLMConfig = None
+    llm_proxy: LLMProxy = None
+    db_config: DBConfig = None
+    db_metadata_manager: DBMetadataManager = None
 
-        # set LLM proxy
-        self.llm_proxy = LLMProxy(config=self.llm_config)
+    # extract sql pattern
+    extract_sql_pattern = rf"({SQL_START_TAG}.*?{SQL_END_TAG})"
 
-        # set embedding proxy
-        if embedding_proxy is None:
-            self.embedding_proxy = EmbeddingProxy()
-        else:
-            self.embedding_proxy = embedding_proxy
+    def __init__(self, llm_config: BaseLLMConfig = None, db_config: DBConfig = None):
+        """Create a SQLGeneratorAgent object
 
-        self.top_k: int = top_k
-        self.verbose: bool = verbose
-
-    def create_sql_agent(self, early_stopping_method: str = "generate") -> AgentExecutor:
+        Args:
+            llm_config (BaseLLMConfig, optional): llm configuration. Defaults to None.
+            db_config (DBConfig, optional): database configuration. Defaults to None.
         """
-        Create a SQL agent executor using our custom SQL agent tools and LLM
-        """
-        logger.info("Creating SQL agent executor...")
+        # if llm_config is None, we will use the default LLM which is Azure LLM
+        self.llm_config = llm_config or AzureLLMConfig()
+        self.llm_proxy = LLMProxy.create_llm_proxy(config=self.llm_config)
 
-        # prepare embedding model, the embedding type is from Azure or Huggingface
-        embedding = self.embedding_proxy.get_embedding()
+        # if db_config is None, we will use the default MySQL database
+        self.db_config = db_config or MySQLConfig()
+        self.db_metadata_manager = self.create_db_metadata_manager()
 
-        agent_tools = SQLAgentToolkits(
-            db_manager=self.db_metadata_manager, embedding=embedding, top_k=self.top_k
-        ).get_tools()
-        tools_name = [tool.name for tool in agent_tools]
+    def create_db_metadata_manager(self) -> DBMetadataManager:
+        """Create a database metadata manager based on the database configuration"""
+        if isinstance(self.db_config, MySQLConfig):
+            return DBMetadataManager(MySQLEngine(self.db_config))
+        if isinstance(self.db_config, PostgreSQLConfig):
+            return DBMetadataManager(PostgreSQLEngine(self.db_config))
 
-        logger.info(f"The agent tools are: {tools_name}")
-
-        # create LLM chain
-        prefix = SQL_AGENT_PREFIX.format(db_type=self.db_config.db_type, plan=PLAN_WITH_VALIDATION)
-        prompt = ZeroShotAgent.create_prompt(
-            tools=agent_tools, prefix=prefix, suffix=SQL_AGENT_SUFFIX, format_instructions=FORMAT_INSTRUCTIONS
-        )
-        llm_chain = LLMChain(llm=self.llm_proxy.llm, prompt=prompt, verbose=self.verbose)
-
-        # create sql agent executor
-        sql_agent = ZeroShotAgent(llm_chain=llm_chain, allowed_tools=tools_name)
-        if self.llm_config.llm_source == "azure":
-            sql_agent_executor = AgentExecutor.from_agent_and_tools(
-                agent=sql_agent, tools=agent_tools, early_stopping_method=early_stopping_method
-            )
-        else:
-            # for perplexity llm, it doesn't support custom stopping words
-            sql_agent_executor = AgentExecutor.from_agent_and_tools(agent=sql_agent, tools=agent_tools)
-
-        logger.info("Finished creating SQL agent executor.")
-        return sql_agent_executor
-
-    def generate_sql_with_agent(self, user_query: str, single_line_format: bool = False) -> Any:
-        """
-        Generate SQL statement using custom SQL agent executor
-        """
-        # create an agent executor
-        sql_agent_executor = self.create_sql_agent()
-        sql_agent_executor.return_intermediate_steps = True
-        sql_agent_executor.handle_parsing_errors = ERROR_PARSING_MESSAGE
-
-        user_query = self.preprocess_input(user_query)
-        _input = {
-            "input": user_query,
-        }
-
-        with get_openai_callback() as cb:
-            try:
-                response = sql_agent_executor.invoke(_input)
-            except openai.AuthenticationError as e:
-                logger.error(f"OpenAI API authentication error: {e}")
-                return ""
-            except openai.RateLimitError as e:
-                logger.error(f"OpenAI API rate limit error: {e}")
-                return f"OpenAI API rate limit error: {e}"
-            except SQLAlchemyError as e:
-                logger.error(f"SQLAlchemy error: {e}")
-                return f"SQLAlchemy error: {e}"
-            except Exception as e:  # pylint: disable=broad-except
-                logger.error(
-                    f"Failed to generate SQL statement using SQL agent executor. Error: {e}, "
-                    f"error type: {type(e).__name__}"
-                )
-                return None
-            if self.verbose:
-                logger.info(f"The callback from openai is:\n{cb}\n")
-
-        if not response:
-            logger.error("Failed to generate SQL statement using SQL agent executor.")
-            return ""
-
-        generated_sql = ""
-        if "```sql" in response["output"]:
-            generated_sql = self.extract_sql_from_llm_response(response["output"])
-            generated_sql = self.remove_markdown_format(generated_sql)
-        else:
-            logger.info("Not found ```sql in LLM output, trying to find result from intermediate steps")
-            generated_sql = self.extract_sql_from_intermediate_steps(response["intermediate_steps"])
-
-        if single_line_format:
-            generated_sql = self.format_sql(generated_sql)
-
-        return generated_sql
+        raise ValueError(f"Unsupported database configuration: {self.db_config.db_type}")
 
     @classmethod
     def preprocess_input(cls, user_query: str) -> str:
@@ -179,10 +92,9 @@ class SQLGeneratorAgent:
         1. avoid too long strings
         2. translate the user input to English
         """
-
-        if len(user_query) > cls.max_input_size:
-            logger.warning(f"The user input is too long, trim it down to a maximum of {cls.max_input_size} characters.")
-            user_query = user_query[: cls.max_input_size]
+        if len(user_query) > MAX_INPUT_LENGTH:
+            logger.warning(f"The user input is too long, trim it down to a maximum of {MAX_INPUT_LENGTH} characters.")
+            user_query = user_query[:MAX_INPUT_LENGTH]
 
         if is_contain_chinese(user_query):
             # translate the user input to English
@@ -200,65 +112,10 @@ class SQLGeneratorAgent:
 
             return user_query
 
-        # don't forget here when the input is normal english statement.
         return user_query
 
-    @deprecated(version="0.1.0", reason="This function only use simple prompt, use generate_sql_with_agent instead")
-    def generate_sql(self, user_query: str, single_line_format: bool = False, verbose=True) -> str:
-        """
-        Generate SQL statement using user input and table metadata
-
-        :param user_query: str - The user's query, in natural language
-        :param single_line_format: bool - Whether to return the SQL query as a single line or not
-        :param verbose: bool - Whether to log the token usage or not
-        :return: str - The generated SQL query
-        """
-
-        # Get tables info from metadata manager
-        tables_info = self.db_metadata_manager.get_db_metadata().tables
-        tables_info_json = [str(table) for table in tables_info]
-
-        # Generate SQL statement using LLM proxy
-        prompt = SYSTEM_PROMPT_DEPRECATED
-        question = prompt.format(
-            metadata=tables_info_json, user_input=user_query, system_constraints=SYSTEM_CONSTRAINTS, db_intro=DB_INTRO
-        )
-
-        response = self.llm_proxy.get_response_from_llm(question=question, verbose=verbose).content
-
-        if not response.startswith("```sql"):
-            logger.warning("Generated SQL statement is not in the expected format, trying to extract SQL...")
-            response = self.extract_sql_from_llm_response(response)
-
-        # Extract the SQL statement from the response
-        sql_statement = self.remove_markdown_format(response)
-
-        # Perform basic validation of the SQL statement
-        if (
-            not sql_statement.startswith("select")
-            and not sql_statement.startswith("insert")
-            and not sql_statement.startswith("update")
-            and not sql_statement.startswith("delete")
-        ):
-            logger.error("Generated SQL statement is not a SELECT, INSERT, UPDATE, or DELETE statement.")
-
-        if single_line_format:
-            return self.format_sql(sql_statement)
-
-        return sql_statement
-
-    # TODO: Move these formatting methods to a Output Parser
     @classmethod
-    def format_sql(cls, sql) -> str:
-        """
-        The generated SQL statement is maybe single line or multi line. (especially for complex statement)
-        Need to format it to make it easier to test
-        """
-        sql = sql.replace("\n", " ").replace("  ", " ").strip()
-        return sql
-
-    @classmethod
-    def remove_markdown_format(cls, sql) -> str:
+    def remove_markdown_format(cls, sql: str) -> str:
         """
         The LLM response contains the SQL statement in the following format:
         ```sql
@@ -266,31 +123,36 @@ class SQLGeneratorAgent:
         ```
         Need to remove the markdown format to get the SQL statement
         """
-        sql = sql.strip("```").strip("sql").strip().lower()
+        if not sql:
+            return ""
+
+        if sql.startswith(SQL_START_TAG):
+            sql = sql.replace(SQL_START_TAG, "", 1)
+
+        if sql.endswith(SQL_END_TAG):
+            sql = sql.replace(SQL_END_TAG, "", 1)
+
+        # remove leading and trailing spaces
+        sql = sql.strip()
+
         # sometimes LLM may response ```sql and ````
         if "`" in sql:
             sql = sql.replace("`", "")
         return sql
 
     @classmethod
-    def extract_sql_from_llm_response(cls, response) -> str:
+    def extract_sql(cls, response) -> str:
         """
-        The LLM response contains the SQL statement in the following format:
-        ```sql
-        select xxxx from xxxx where xxxx
-        ```
+        Extract the SQL statement from the LLM response
 
         Params:
             response: The response from LLM
         Return:
-            The SQL statement wrapper by ```sql and ``` tags
+            The SQL statement wrapped in ```sql and ``` tags
         """
-        expected_start_format = "```sql"
-        expected_end_format = "```"
-        expected_pattern = rf"({expected_start_format}.*?{expected_end_format})"
 
         # Extract the SQL statement from the response
-        extracted_sqls: list = re.findall(expected_pattern, response, re.DOTALL)
+        extracted_sqls: list = re.findall(cls.extract_sql_pattern, response, re.DOTALL)
 
         if not extracted_sqls:
             logger.error("Failed to extract SQL statement from LLM response.")
@@ -301,7 +163,174 @@ class SQLGeneratorAgent:
 
         extracted_sql: str = extracted_sqls[0]
 
-        return extracted_sql
+        sql = cls.remove_markdown_format(extracted_sql)
+
+        return sql
+
+    @classmethod
+    def format_sql(cls, sql: str, single_line: bool = False) -> str:
+        """
+        Remove unnecessary characters and format the SQL statement
+        """
+        if not sql:
+            return ""
+
+        sql = sql.strip()
+
+        sql = sql.replace("\\", "")
+        sql = sqlparse.format(sql, keyword_case="upper")
+
+        if single_line:
+            sql = sql.replace("\n", " ")
+            sql = sql.replace("  ", " ")
+
+        sql = str(sql)
+        return sql
+
+    @abstractmethod
+    def generate_sql(
+        self, user_query: str, instructions: str = None, single_line_format: bool = False, verbose: bool = True
+    ) -> SQLGeneratorResponse:
+        """Generate SQL statement using currect agent for the user query and instructions
+
+        Args:
+            user_query (str): The user's query, in natural language
+            instructions (str): Instructions for the SQL agent when generating SQL. Defaults to None.
+            single_line_format (bool, optional): If format the SQL to single line. Defaults to False.
+            verbose (bool, optional): If print some additional message such as token usage. Defaults to True.
+        """
+        pass
+
+
+class SQLGeneratorAgent(BaseSQLGeneratorAgent):
+    """
+    A MRKL LLM Agent that generates SQL using ZeroShotAgent in Langchain with custom SQL agent tools
+    """
+
+    def __init__(
+        self,
+        llm_config: BaseLLMConfig = None,
+        embedding_proxy: EmbeddingProxy = None,
+        db_config: DBConfig = None,
+        top_k=settings.TOP_K,
+        verbose=True,
+    ):
+        super().__init__(llm_config=llm_config, db_config=db_config)
+
+        # set embedding proxy for the tools
+        self.embedding_proxy = embedding_proxy or EmbeddingProxy()
+
+        self.top_k: int = top_k
+        self.verbose: bool = verbose
+
+    def create_sql_agent(self, instructions: str = "", early_stopping_method: str = "generate") -> AgentExecutor:
+        """
+        Create a SQL agent executor using our custom SQL agent tools and LLM
+        """
+        logger.info("Creating SQL agent executor...")
+
+        # prepare embedding model, the embedding type is from Azure or Huggingface
+        embedding = self.embedding_proxy.get_embedding()
+
+        agent_tools = SQLAgentToolkits(
+            db_manager=self.db_metadata_manager, embedding=embedding, top_k=self.top_k
+        ).get_tools()
+        tools_name = [tool.name for tool in agent_tools]
+
+        logger.info(f"The agent tools are: {tools_name}")
+
+        # create prompt for the SQL agent
+        plan = PLAN_WITH_VALIDATION.format(db_type=self.db_config.db_type)
+        if instructions and instructions.lower() != "nan":
+            plan = PLAN_WITH_INSTUCTIONS_AND_VALIDATION.format(
+                instructions=instructions, db_type=self.db_config.db_type
+            )
+
+        prefix = SQL_AGENT_PREFIX.format(db_type=self.db_config.db_type, plan=plan)
+        prompt = ZeroShotAgent.create_prompt(
+            tools=agent_tools, prefix=prefix, suffix=SQL_AGENT_SUFFIX, format_instructions=FORMAT_INSTRUCTIONS
+        )
+
+        # create LLM chain
+        llm_chain = LLMChain(llm=self.llm_proxy.llm, prompt=prompt, verbose=self.verbose)
+
+        # create sql agent executor
+        sql_agent = ZeroShotAgent(llm_chain=llm_chain, allowed_tools=tools_name)
+        if self.llm_config.llm_source in ["azure", "meta"]:
+            sql_agent_executor = AgentExecutor.from_agent_and_tools(
+                agent=sql_agent, tools=agent_tools, early_stopping_method=early_stopping_method
+            )
+        else:
+            # for perplexity llm, it doesn't support custom stopping words
+            sql_agent_executor = AgentExecutor.from_agent_and_tools(agent=sql_agent, tools=agent_tools)
+
+        logger.info("Finished creating SQL agent executor.")
+        return sql_agent_executor
+
+    def generate_sql(
+        self, user_query: str, instructions: str = None, single_line_format: bool = False, verbose: bool = True
+    ) -> SQLGeneratorResponse:
+
+        # create an agent executor
+        sql_agent_executor = self.create_sql_agent(instructions=instructions)
+        sql_agent_executor.return_intermediate_steps = True
+        sql_agent_executor.handle_parsing_errors = ERROR_PARSING_MESSAGE
+
+        _user_query = self.preprocess_input(user_query)
+        _input = {
+            "input": _user_query,
+        }
+
+        with get_openai_callback() as cb:
+            error = None
+            try:
+                response = sql_agent_executor.invoke(_input)
+            except (openai.APIConnectionError, openai.AuthenticationError, openai.RateLimitError) as e:
+                logger.error(f"OpenAI API error: {e}")
+                error = str(e)
+            except SQLAlchemyError as e:
+                logger.error(f"SQLAlchemy error: {e}")
+                error = str(e)
+            except Exception as e:  # pylint: disable=broad-except
+                logger.error(
+                    f"Failed to generate SQL statement using SQL agent executor. Error: {e}, "
+                    f"error type: {type(e).__name__}"
+                )
+                error = str(e)
+
+            if error:
+                return SQLGeneratorResponse(
+                    question=user_query,
+                    db_name=self.db_config.db_name,
+                    generated_sql="",
+                    token_usage=-1,
+                    llm_source=self.llm_config.llm_source,
+                    llm_model=self.llm_config.model,
+                    error=error,
+                )
+
+            if self.verbose or verbose:
+                logger.info(f"The callback from openai is:\n{cb}\n")
+
+        generated_sql = ""
+        if SQL_START_TAG in response["output"]:
+            generated_sql = self.extract_sql(response["output"])
+        else:
+            logger.info(f"Not found {SQL_START_TAG} in LLM output, trying to find result from intermediate steps")
+            generated_sql = self.extract_sql_from_intermediate_steps(response["intermediate_steps"])
+            if generated_sql:
+                logger.info(f"Found SQL from intermediate steps: {generated_sql}")
+
+        generated_sql = self.format_sql(generated_sql, single_line=single_line_format)
+
+        return SQLGeneratorResponse(
+            question=user_query,
+            db_name=self.db_config.db_name,
+            generated_sql=generated_sql,
+            token_usage=cb.total_tokens,
+            llm_source=self.llm_config.llm_source,
+            llm_model=self.llm_config.model,
+        )
 
     @classmethod
     def extract_sql_from_intermediate_steps(cls, intermediate_steps: List[Tuple[AgentAction, str]]) -> str:
@@ -314,8 +343,7 @@ class SQLGeneratorAgent:
             if isinstance(action, AgentAction) and action.tool == "ValidateSQLCorrectness":
                 # Input: an SQL wrapper in ```sql and ``` tags.
                 tool_input = action.tool_input
-                sql = cls.extract_sql_from_llm_response(tool_input)
-                sql = cls.remove_markdown_format(sql)
+                sql = cls.extract_sql(tool_input)
 
         # if we don't find sql in the ValidateSQLCorrectness tool, we will try to find sql in previous step
         if not sql:
@@ -327,9 +355,147 @@ class SQLGeneratorAgent:
                 # Action: xxx
                 # Action Input: xxx
                 thought = action.log.split("Action:")[0]
-                if "```sql" in thought:
-                    sql = cls.extract_sql_from_llm_response(thought)
-                    sql = cls.remove_markdown_format(sql)
+                if SQL_START_TAG in thought:
+                    sql = cls.extract_sql(thought)
                     if not sql.lower().strip().startswith("select"):
                         sql = ""
         return sql
+
+
+class SimpleSQLGeneratorAgent(BaseSQLGeneratorAgent):
+    """A simple agent without any tools to generate SQL statements"""
+
+    def __init__(self, llm_config: BaseLLMConfig = None, db_config: DBConfig = None):
+        super().__init__(llm_config=llm_config, db_config=db_config)
+
+    def generate_sql(
+        self, user_query: str, instructions: str = None, single_line_format: bool = False, verbose: bool = True
+    ) -> SQLGeneratorResponse:
+        # preprocess the user input
+        _user_query = self.preprocess_input(user_query)
+
+        if instructions == "nan":
+            instructions = ""
+
+        # Get tables info from metadata manager
+        tables = self.db_metadata_manager.get_db_metadata().tables
+        tables_info = []
+
+        for table in tables:
+            table_name = table.table_name
+
+            columns_str = ""
+            for column in table.columns:
+                # Extract column name and comment from the column metadata to generate embedding
+                if column.comment:
+                    columns_str += f"{column.column_name}: {column.comment}, "
+                else:
+                    columns_str += f"{column.column_name}, "
+
+            table_str = f"Table {table_name} contain columns: [{columns_str}]."
+            if table.description:
+                table_str += f" and table description: {table.description}"
+
+            tables_info.append([table_name, table_str])
+
+        # Generate SQL statement using LLM proxy
+        question = SIMPLE_PROMPT.format(
+            dialect=self.db_config.db_type,
+            database_metadata=tables_info,
+            user_input=_user_query,
+            instructions=instructions,
+        )
+
+        raw_response: BaseMessage = self.llm_proxy.get_response_from_llm(question=question, verbose=verbose)
+        response = raw_response.content
+
+        if SQL_START_TAG in response:
+            response = self.extract_sql(response)
+        else:
+            logger.warning("Generated SQL statement is not in the expected format, trying to extract SQL...")
+            response = self.extract_sql(str(raw_response))
+
+        response = self.format_sql(sql=response, single_line=single_line_format)
+
+        token_usage = -1
+        if (
+            "token_usage" in raw_response.response_metadata
+            and "total_tokens" in raw_response.response_metadata["token_usage"]
+        ):
+            token_usage = max(raw_response.response_metadata["token_usage"]["total_tokens"], token_usage)
+
+        return SQLGeneratorResponse(
+            question=user_query,
+            db_name=self.db_config.db_name,
+            generated_sql=response,
+            token_usage=token_usage,
+            llm_source=self.llm_config.llm_source,
+            llm_model=self.llm_config.model,
+        )
+
+
+class LangchainSQLGeneratorAgent(BaseSQLGeneratorAgent):
+    """A SQL generator agent that uses Langchain to generate SQL statements"""
+
+    def __init__(self, llm_config: BaseLLMConfig = None, db_config: DBConfig = None):
+        super().__init__(llm_config=llm_config, db_config=db_config)
+
+    def generate_sql(
+        self, user_query: str, instructions: str = None, single_line_format: bool = False, verbose: bool = True
+    ) -> SQLGeneratorResponse:
+        # preprocess the user input
+        _user_query = self.preprocess_input(user_query)
+        _input = {"question": _user_query, "instructions": instructions}
+
+        # create a langchain SQL chain
+        langchain_db = SQLDatabase(engine=self.db_metadata_manager.db_engine.get_sqlalchemy_engine())
+
+        # prompt = MYSQL_PROMPT if isinstance(self.db_config, MySQLConfig) else LANGCHAIN_POSTGRES_PROMPT
+
+        sql_chain = create_sql_query_chain(llm=self.llm_proxy.llm, db=langchain_db)
+
+        with get_openai_callback() as cb:
+            try:
+                response = sql_chain.invoke(_input)
+                error = ""
+            except (openai.APIConnectionError, openai.AuthenticationError, openai.RateLimitError) as e:
+                logger.error(f"OpenAI API error: {e}")
+                error = str(e)
+            except SQLAlchemyError as e:
+                logger.error(f"SQLAlchemy error: {e}")
+                error = str(e)
+            except Exception as e:  # pylint: disable=broad-except
+                logger.error(
+                    f"Failed to generate SQL statement using Langchain. Error: {e}, error type: {type(e).__name__}"
+                )
+                error = str(e)
+
+            if error:
+                return SQLGeneratorResponse(
+                    question=user_query,
+                    db_name=self.db_config.db_name,
+                    generated_sql="",
+                    token_usage=-1,
+                    llm_source=self.llm_config.llm_source,
+                    llm_model=self.llm_config.model,
+                    error=error,
+                )
+
+        if response.lower().startswith("select"):
+            response = response.split(";")[0]
+        elif SQL_START_TAG in response:
+            response = self.extract_sql(response)
+        else:
+            logger.warning("Failed to extract SQL statement from Langchain response")
+            response = ""
+
+        response = self.format_sql(sql=response, single_line=single_line_format)
+
+        return SQLGeneratorResponse(
+            question=user_query,
+            db_name=self.db_config.db_name,
+            generated_sql=response,
+            token_usage=cb.total_tokens,
+            llm_source=self.llm_config.llm_source,
+            llm_model=self.llm_config.model,
+        )

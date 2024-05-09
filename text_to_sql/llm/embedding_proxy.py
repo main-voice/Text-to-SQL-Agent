@@ -2,6 +2,7 @@
 Proxy class to supported embedding models
 """
 
+from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any, List, Optional, Union
 
@@ -17,7 +18,7 @@ from text_to_sql.utils.logger import get_logger
 logger = get_logger(__name__)
 
 
-class BaseEmbedding(BaseModel):
+class BaseEmbedding(ABC, BaseModel):
     """
     Base class for embeddings
     """
@@ -26,6 +27,7 @@ class BaseEmbedding(BaseModel):
     _available_models: List[str] = []
     embedding: Optional[Union[AzureOpenAIEmbeddings, HuggingFaceEmbeddings]] = None
 
+    @abstractmethod
     def get_embedding_model(self) -> Any:
         """
         Get the embedding model
