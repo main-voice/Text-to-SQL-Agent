@@ -178,8 +178,9 @@ class Evaluator:
             self.db_config.db_name = db_name
 
         if self.eval_method == "agent":
+            # create the SQL generator agent, NOTICE: we don't consider time for evaluation
             self.sql_generator = SQLGeneratorAgent(
-                llm_config=self.llm_config, db_config=self.db_config, verbose=self.verbose
+                llm_config=self.llm_config, db_config=self.db_config, verbose=self.verbose, add_current_time=False
             )
         elif self.eval_method == "langchain":
             self.sql_generator = LangchainSQLGeneratorAgent(llm_config=self.llm_config, db_config=self.db_config)
