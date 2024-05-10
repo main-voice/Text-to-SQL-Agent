@@ -437,6 +437,10 @@ class Evaluator:
         )
 
         if not sql_generator_response.generated_sql or sql_generator_response.error:
+            if sql_generator_response.error:
+                result_item.error_detail = sql_generator_response.error
+            else:
+                result_item.error_detail = "Failed to generate the query."
             logger.error(
                 f"Failed to generate query for question: {eval_item.question},\
                 the error is {sql_generator_response.error}."
@@ -505,10 +509,13 @@ class Evaluator:
                     logger.info(f"The generated query is correct. One of acceptable result: \n{acceptable_result}\n")
                     return True
 
+            warning_message = "Can not match any golden query results"
+            logger.warning(warning_message)
+            result_item.error_detail = warning_message
             return False
 
-        except ValueError as e:
-            logger.error(f"Error when executing the query: {e}")
+        except Exception as e:
+            result_item.error_detail = str(e)
             return False
 
     def compare_df(
@@ -718,19 +725,19 @@ class Evaluator:
             if isinstance(orig, psycopg2.Error):
                 logger.error(f"It's origin is psycopg2 Error in executing the query: {orig}")
             capture_exception(e)
-            return pd.DataFrame()
+            raise e
         except SQLAlchemyError as e:
             logger.error(f"SQLAlchemyError when executing the query: error is {e}, query is {query}")
             capture_exception(e)
-            return pd.DataFrame()
+            raise e
         except psycopg2.Error as e:
             logger.error(f"psycopg2.Error in executing the query: error is {e}, query is {query}")
             capture_exception(e)
-            return pd.DataFrame()
+            raise e
         except Exception as e:  # pylint: disable=broad-except
             logger.error(f"Unknown error in executing the query: error is {e}, query is {query}")
             capture_exception(e)
-            return pd.DataFrame()
+            raise e
 
 
 if __name__ == "__main__":
@@ -801,7 +808,7 @@ if __name__ == "__main__":
             num_questions=args.num_questions, start_index=args.start_index, previous_eval_file=args.pre_eval_result_file
         )
         evaluator.save_output(args.eval_type, results)
-    except Exception as e:  # pylint: disable=broad-except
-        logger.error(f"Error in evaluating the generated SQL queries: {e}")
-        capture_exception(e)
+    except Exception as error:  # pylint: disable=broad-except
+        logger.error(f"Error in evaluating the generated SQL queries: {error}")
+        capture_exception(error)
         evaluator.save_output(args.eval_type)

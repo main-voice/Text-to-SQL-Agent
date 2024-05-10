@@ -41,3 +41,5 @@ class EvalResultItem(BaseModel):
     is_correct: Optional[bool] = Field(default=False)
     exec_correct: Optional[bool] = Field(default=False)
     eval_duration: Optional[float] = Field(default=None)
+
+    error_detail: str = Field(default=None, description="Error detail message if any")
