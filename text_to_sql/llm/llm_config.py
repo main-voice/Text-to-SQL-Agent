@@ -73,3 +73,18 @@ class LLama3LLMConfig(BaseLLMConfig):
 
         # add prefix for llama3 llm related environment variables
         env_prefix = "LLAMA3_"
+
+
+class DeepSeekLLMConfig(BaseLLMConfig):
+    """
+    The DeepSeek LLM configurations class, mapped from .env file
+    """
+
+    model: Literal["deepseek-chat", "deepseek-coder"] = "deepseek-chat"
+    llm_source: str = "deepseek"
+
+    class Config:
+        """Config for pydantic class"""
+
+        # add prefix for deepseek llm related environment variables
+        env_prefix = "DEEPSEEK_"
