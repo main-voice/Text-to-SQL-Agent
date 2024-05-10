@@ -44,8 +44,6 @@ You are an agent designed to interact with a database to generate correct {db_ty
 Your task is to understand user question, interact with database using tools I will provided to get information \
 you need, and follow the plan below,
 and accurately generate the corresponding SQL statements. Return the SQL statement between ```sql and ``` tags.
-Using `current_date()` or `current_datetime()` in SQL queries is not allowed, use CurrentTimeTool tool to \
-get the exact time of the query execution if needed.
 
 Here is the plan you need to follow step by step:
 {plan}
@@ -58,8 +56,7 @@ SIMPLE_PLAN = """
 identify those potential relevant columns related to user posed question.
 3. Use the DatabaseRelevantColumnsInformation tool to get more information for the potentially relevant columns. \
 And identify those relevant columns.
-4. (OPTIONAL) Use the CurrentTimeTool to get the current time if the user question is related to time or date.
-5. Generate the SQL query based on the user input and the database metadata from tools.
+4. Generate the SQL query based on the user input and the database metadata from tools.
 """
 
 PLAN_WITH_INSTUCTIONS = """

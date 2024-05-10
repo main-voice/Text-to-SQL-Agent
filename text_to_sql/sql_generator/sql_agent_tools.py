@@ -424,8 +424,7 @@ class SQLAgentToolkits(BaseToolkit):
         arbitrary_types_allowed = True
         extra = "allow"
 
-    def get_tools(self) -> List[BaseTool]:
-        # TODO: Add tools choice for the agent
+    def get_tools(self, with_time: bool = True) -> List[BaseTool]:
         _tools = []
 
         # Find relevant tables tool
@@ -443,17 +442,9 @@ class SQLAgentToolkits(BaseToolkit):
         _tools.append(tables_info_tool)
 
         # Get current time tool
-        current_time_tool = CurrentTimeTool(db_manager=self.db_manager)
-        _tools.append(current_time_tool)
-
-        # Add translation tool
-        # translator: BaseTranslator = None
-        # if translate_source == "llm":
-        #     translator = LLMTranslator()
-        # elif translate_source == "youdao":
-        #     translator = YoudaoTranslator()
-        #
-        # _tools.append(TranslateTool(db_manager=self.db_manager, translator=translator))
+        if with_time:
+            current_time_tool = CurrentTimeTool(db_manager=self.db_manager)
+            _tools.append(current_time_tool)
 
         # Validate SQL correctness tool
         validate_sql_tool = ValidateSQLCorrectness(db_manager=self.db_manager)

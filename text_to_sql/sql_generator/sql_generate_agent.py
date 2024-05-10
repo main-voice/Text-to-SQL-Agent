@@ -26,6 +26,7 @@ from text_to_sql.database.db_metadata_manager import DBMetadataManager
 from text_to_sql.llm.embedding_proxy import EmbeddingProxy
 from text_to_sql.llm.llm_config import AzureLLMConfig, BaseLLMConfig
 from text_to_sql.llm.llm_proxy import LLMProxy
+from text_to_sql.llm.prompts import AgentPlanPromptBuilder
 from text_to_sql.sql_generator.sql_agent_tools import SQLAgentToolkits
 from text_to_sql.sql_generator.sql_generate_response import SQLGeneratorResponse
 from text_to_sql.utils import is_contain_chinese
@@ -33,8 +34,6 @@ from text_to_sql.utils.logger import get_logger
 from text_to_sql.utils.prompt import (
     ERROR_PARSING_MESSAGE,
     FORMAT_INSTRUCTIONS,
-    PLAN_WITH_INSTUCTIONS_AND_VALIDATION,
-    PLAN_WITH_VALIDATION,
     SIMPLE_PROMPT,
     SQL_AGENT_PREFIX,
     SQL_AGENT_SUFFIX,
@@ -214,6 +213,7 @@ class SQLGeneratorAgent(BaseSQLGeneratorAgent):
         db_config: DBConfig = None,
         top_k=settings.TOP_K,
         verbose=True,
+        add_current_time=True,
     ):
         super().__init__(llm_config=llm_config, db_config=db_config)
 
@@ -222,33 +222,44 @@ class SQLGeneratorAgent(BaseSQLGeneratorAgent):
 
         self.top_k: int = top_k
         self.verbose: bool = verbose
+        self.add_current_time: bool = add_current_time
 
     def create_sql_agent(self, instructions: str = "", early_stopping_method: str = "generate") -> AgentExecutor:
         """
         Create a SQL agent executor using our custom SQL agent tools and LLM
+
+        Args:
+            instructions (str): Instructions for the SQL agent when generating SQL. Defaults to "".
+            early_stopping_method (str): The early stopping method for the agent executor. Defaults to "generate".
+
+        Returns:
+            AgentExecutor: The SQL agent executor
         """
         logger.info("Creating SQL agent executor...")
 
         # prepare embedding model, the embedding type is from Azure or Huggingface
         embedding = self.embedding_proxy.get_embedding()
 
-        agent_tools = SQLAgentToolkits(
+        # get the SQL agent tools
+        sql_agent_toolkits = SQLAgentToolkits(
             db_manager=self.db_metadata_manager, embedding=embedding, top_k=self.top_k
-        ).get_tools()
+        )
+        agent_tools = sql_agent_toolkits.get_tools(with_time=self.add_current_time)
         tools_name = [tool.name for tool in agent_tools]
 
         logger.info(f"The agent tools are: {tools_name}")
 
         # create prompt for the SQL agent
-        plan = PLAN_WITH_VALIDATION.format(db_type=self.db_config.db_type)
-        if instructions and instructions.lower() != "nan":
-            plan = PLAN_WITH_INSTUCTIONS_AND_VALIDATION.format(
-                instructions=instructions, db_type=self.db_config.db_type
-            )
 
-        prefix = SQL_AGENT_PREFIX.format(db_type=self.db_config.db_type, plan=plan)
+        agent_plan_prompt_builder = AgentPlanPromptBuilder(db_type=self.db_config.db_type)
+        agent_plan_prompt_template = agent_plan_prompt_builder.build_plan_template(
+            instructions=instructions, add_current_time=self.add_current_time
+        )
+        agent_plan_prompt = agent_plan_prompt_template.format(instructions=instructions)
+
+        prompt_prefix = SQL_AGENT_PREFIX.format(db_type=self.db_config.db_type, plan=agent_plan_prompt)
         prompt = ZeroShotAgent.create_prompt(
-            tools=agent_tools, prefix=prefix, suffix=SQL_AGENT_SUFFIX, format_instructions=FORMAT_INSTRUCTIONS
+            tools=agent_tools, prefix=prompt_prefix, suffix=SQL_AGENT_SUFFIX, format_instructions=FORMAT_INSTRUCTIONS
         )
 
         # create LLM chain
@@ -268,8 +279,24 @@ class SQLGeneratorAgent(BaseSQLGeneratorAgent):
         return sql_agent_executor
 
     def generate_sql(
-        self, user_query: str, instructions: str = None, single_line_format: bool = False, verbose: bool = True
+        self,
+        user_query: str,
+        instructions: str = None,
+        single_line_format: bool = False,
+        verbose: bool = True,
     ) -> SQLGeneratorResponse:
+        """Generate SQL statement using the SQL agent executor
+
+        Args:
+            user_query (str): The user's query, in natural language
+            instructions (str, optional): The user's instructions for the SQL. Defaults to None.
+            add_current_time (bool, optional): If add current time to the prompt. Defaults to True.
+            single_line_format (bool, optional): If format the SQL to a single line. Defaults to False.
+            verbose (bool, optional): If logging some info. Defaults to True.
+
+        Returns:
+            SQLGeneratorResponse: The response of the SQL generator
+        """
 
         # create an agent executor
         sql_agent_executor = self.create_sql_agent(instructions=instructions)
