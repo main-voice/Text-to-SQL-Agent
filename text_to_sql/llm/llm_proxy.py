@@ -11,7 +11,7 @@ from langchain_openai import AzureChatOpenAI, ChatOpenAI
 
 from text_to_sql.utils.logger import get_logger
 
-from .llm_config import AzureLLMConfig, BaseLLMConfig, LLama3LLMConfig, PerplexityLLMConfig
+from .llm_config import AzureLLMConfig, BaseLLMConfig, DeepSeekLLMConfig, LLama3LLMConfig, PerplexityLLMConfig
 
 logger = get_logger(__name__)
 
@@ -114,6 +114,34 @@ class LLama3LLM(BaseLLM):
             raise e
 
 
+class DeepSeekLLM(BaseLLM):
+    """The DeepSeek LLM class"""
+
+    def get_llm_instance(self, config: BaseLLMConfig) -> ChatOpenAI:
+        """Static method, will return a DeepSeek LLM instance according to the configuration provided
+
+        Args:
+            config (DeepSeekLLMConfig): The config information for the DeepSeek LLM
+
+        Returns:
+            ChatOpenAI: A DeepSeek llm instance defined in langchain_openai
+        """
+        if not isinstance(config, DeepSeekLLMConfig):
+            raise TypeError(f"Expected LLama3LLMConfig, got {type(config)}")
+
+        try:
+            return ChatOpenAI(
+                base_url=config.endpoint,
+                api_key=config.api_key,
+                model=config.model,
+                temperature=config.temperature,
+                max_tokens=config.max_tokens,
+            )
+        except Exception as e:
+            logger.error(f"Failed to creat DeepSeek LLM instance: {e}")
+            raise e
+
+
 class LLMProxy:
     """
     A Proxy class to interact with the supported LLMs
@@ -131,6 +159,7 @@ class LLMProxy:
             "azure": AzureLLM,
             "perplexity": PerplexityLLM,
             "meta": LLama3LLM,
+            "deepseek": DeepSeekLLM,
         }.get(config.llm_source, None)
 
         if llm_class is None:

@@ -19,7 +19,7 @@ from text_to_sql.config.settings import settings
 from text_to_sql.database.db_config import DBConfig, MySQLConfig, PostgreSQLConfig
 from text_to_sql.database.db_engine import DBEngine, MySQLEngine, PostgreSQLEngine
 from text_to_sql.eval.models import EvalItem, EvalResultItem, SQLHardness
-from text_to_sql.llm.llm_config import AzureLLMConfig, BaseLLMConfig, LLama3LLMConfig
+from text_to_sql.llm.llm_config import AzureLLMConfig, BaseLLMConfig, DeepSeekLLMConfig, LLama3LLMConfig
 from text_to_sql.sql_generator.sql_generate_agent import (
     BaseSQLGeneratorAgent,
     LangchainSQLGeneratorAgent,
@@ -144,7 +144,7 @@ class Evaluator:
         """
         create the LLM config based on the model type and model name.
         """
-        supported_model_types = ["azure", "llama3"]
+        supported_model_types = ["azure", "llama3", "deepseek"]
         if self.model_type not in supported_model_types:
             raise ValueError(
                 f"Unsupported model type {self.model_type}. Supported model types are {supported_model_types}"
@@ -159,6 +159,9 @@ class Evaluator:
         elif self.model_type == "llama3":
             logger.info("Creating Llama3 LLM Config for Evaluation...")
             self.llm_config = LLama3LLMConfig(model=self.model)
+        elif self.model_type == "deepseek":
+            logger.info("Creating DeepSeek LLM Config for Evaluation...")
+            self.llm_config = DeepSeekLLMConfig(model=self.model)
         else:
             raise ValueError(f"Unsupported model type {self.model_type}")
 
