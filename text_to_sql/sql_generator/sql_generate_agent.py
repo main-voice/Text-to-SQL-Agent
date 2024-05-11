@@ -512,6 +512,16 @@ class LangchainSQLGeneratorAgent(BaseSQLGeneratorAgent):
             response = response.split(";")[0]
         elif SQL_START_TAG in response:
             response = self.extract_sql(response)
+        elif "select" in response.lower():
+            # Format: SQLQuery: \n SELECT xxx FROM xxx WHERE xxx;\n\nSQLResult:
+            # Extract the SQL statement from the response
+            pattern = r"SELECT.*?;"
+            matches = re.findall(pattern, response, re.S | re.I)
+            for match in matches:
+                match = match.strip()
+            if len(matches) > 1:
+                logger.warning("Multiple SQL statements found in Langchain response. Using the first one.")
+            response = matches[0] if matches else ""
         else:
             logger.warning("Failed to extract SQL statement from Langchain response")
             response = ""

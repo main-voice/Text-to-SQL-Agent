@@ -22,10 +22,11 @@ The generated query will run on a database with the following metadata:
 The user input question is: "{user_input}"
 
 ### Instructions
-1. Pay attention to use only the column names you can see in the tables below. Be careful to not query for columns that\
+1. Pay attention to use only the column names you can see in the tables above. Be careful to not query for columns that\
 s do not exist.
 2. Do not add any explanations or comments for the SQL query.
-3. Other instructions are: "{instructions}"
+3. When you writing PostgreSQL, to compare different data types you MUST explicitly cast them using the CAST operator.
+4. Other instructions are: "{instructions}"
 
 ### ANSWER
 Present the generated query within ```sql and ``` tags, for example:

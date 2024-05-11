@@ -112,5 +112,8 @@ ValidateQueryCorrectness tool to execute it on database to check if the query is
         """
         return """\n## Other points you need to remember:
 point 1: Always execute the SQL query by calling ValidateQueryCorrectness tool to make sure the results are correct.
-point 2: If the SQL query is wrong after calling ValidateQueryCorrectness tool, rewrite the SQL query and check it again
+point 2: If the SQL query is wrong after calling ValidateQueryCorrectness tool, rewrite the SQL query and \
+check it again, but do not exceed three rewrites.
+point 3. When writing Postgres SQL, when comparing different data types, you must use the CAST operator to explicitly \
+convert data types. Avoid direct comparisons (greater than, less than, or equal to) between different types of data."
 """

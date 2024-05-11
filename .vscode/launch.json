@@ -346,6 +346,81 @@
       }
     },
     {
+      "name": "Prod: Eval Simple using DeepSeek",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/text_to_sql/eval/evaluator.py",
+      "console": "integratedTerminal",
+      "args": [
+        "--model_type",
+        "deepseek",
+        "--model",
+        "deepseek-chat",
+        "--eval_method",
+        "simple",
+        "--num_questions",
+        "200",
+        "--eval_type",
+        "prod",
+        "--pre_eval_result_file",
+        "deepseek/prod_simple_deepseek-chat.json"
+      ],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      }
+    },
+    {
+      "name": "Prod: Eval Agent using DeepSeek",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/text_to_sql/eval/evaluator.py",
+      "console": "integratedTerminal",
+      "args": [
+        "--model_type",
+        "deepseek",
+        "--model",
+        "deepseek-chat",
+        "--eval_method",
+        "agent",
+        "--num_questions",
+        "200",
+        "--eval_type",
+        "prod",
+        "--pre_eval_result_file",
+        "deepseek/prod_agent_deepseek-chat.json"
+      ],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      }
+    },
+    {
+      "name": "Prod: Eval Langchain using DeepSeek",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/text_to_sql/eval/evaluator.py",
+      "console": "integratedTerminal",
+      "args": [
+        "--model_type",
+        "deepseek",
+        "--model",
+        "deepseek-chat",
+        "--eval_method",
+        "langchain",
+        "--num_questions",
+        "200",
+        "--eval_type",
+        "prod",
+        "--pre_eval_result_file",
+        "deepseek/prod_langchain_deepseek-chat.json"
+      ],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      }
+    },
+    {
       "name": "template",
       "type": "debugpy",
       "request": "launch",

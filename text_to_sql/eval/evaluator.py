@@ -750,7 +750,9 @@ if __name__ == "__main__":
     arg_parser.add_argument("--db_type", type=str, default="postgres", help="Type of the database.")
 
     # llm related arguments
-    arg_parser.add_argument("--model_type", type=str, help="Type of the LLM model.", choices=["azure", "llama3"])
+    arg_parser.add_argument(
+        "--model_type", type=str, help="Type of the LLM model.", choices=["azure", "llama3", "deepseek"]
+    )
     arg_parser.add_argument("--model", type=str, help="Model name of the LLM.")
 
     # evaluation related arguments
@@ -811,4 +813,4 @@ if __name__ == "__main__":
     except Exception as error:  # pylint: disable=broad-except
         logger.error(f"Error in evaluating the generated SQL queries: {error}")
         capture_exception(error)
-        evaluator.save_output(args.eval_type)
+        evaluator.save_output(args.eval_type, results)
