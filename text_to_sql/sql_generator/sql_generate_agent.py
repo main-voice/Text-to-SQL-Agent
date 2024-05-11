@@ -413,7 +413,6 @@ class SimpleSQLGeneratorAgent(BaseSQLGeneratorAgent):
 
             columns_str = ""
             for column in table.columns:
-                # Extract column name and comment from the column metadata to generate embedding
                 if column.comment:
                     columns_str += f"{column.column_name}: {column.comment}, "
                 else:
