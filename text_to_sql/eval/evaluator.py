@@ -1,6 +1,7 @@
 """The Evaluator class is used to evaluate the generated SQL queries against the ground truth queries."""
 
 import argparse
+import concurrent.futures
 import itertools
 import json
 import re
@@ -371,29 +372,38 @@ class Evaluator:
         # first we have a dataframe with the questions and the ground truth queries
         eval_items: List[EvalItem] = self.loader.load_eval_items(max_rows=num_questions, start_index=start_index)
         logger.info(f"Loaded {len(eval_items)} evaluation items starting from index {start_index}.")
-        self.eval_results = []
+        self.eval_results = [None] * len(eval_items)  # initialize the eval results
 
-        for eval_item in tqdm(eval_items, desc="Evaluating...", total=len(eval_items)):
-            if previous_eval_file:
-                # Check if the current eval_item exists in previous results
-                previous_result = next(
-                    (
-                        item
-                        for item in pre_eval_results
-                        if item.question == eval_item.question and item.db_name == eval_item.db_name
-                    ),
-                    None,
-                )
-                if previous_result and previous_result.is_correct:
-                    # If the previous result is correct, skip evaluation
-                    logger.info(f"Skip evaluation: Question: {eval_item.question} is already correct.")
-                    self.eval_results.append(previous_result)
-                    continue
+        with concurrent.futures.ThreadPoolExecutor(max_workers=self.parallel_threads) as executor:
+            future_to_index = {}
 
-            logger.info(f"Start evaluating question: {eval_item.question}, the database is {eval_item.db_name}...")
+            for index, eval_item in enumerate(eval_items):
+                if previous_eval_file:
+                    # Check if the current eval_item exists in previous results
+                    previous_result = next(
+                        (
+                            item
+                            for item in pre_eval_results
+                            if item.question == eval_item.question and item.db_name == eval_item.db_name
+                        ),
+                        None,
+                    )
+                    if previous_result and previous_result.is_correct:
+                        # If the previous result is correct, skip evaluation
+                        logger.info(f"Skip evaluation: Question: {eval_item.question} is already correct.")
+                        self.eval_results[index] = previous_result
+                        continue
 
-            item_eval_result = self.eval_single_item(eval_item)
-            self.eval_results.append(item_eval_result)
+                logger.info(f"Start evaluating question: {eval_item.question}, the database is {eval_item.db_name}...")
+                future = executor.submit(self.eval_single_item, eval_item)
+                future_to_index[future] = index
+
+            for future in tqdm(
+                concurrent.futures.as_completed(future_to_index), total=len(future_to_index), desc="Evaluating..."
+            ):
+                index = future_to_index[future]
+                result_item = future.result()
+                self.eval_results[index] = result_item
 
         return self.eval_results
 
@@ -767,6 +777,7 @@ if __name__ == "__main__":
         default="",
         help="[Optional] Path to an existing evaluation result file, will update the existing file.",
     )
+    arg_parser.add_argument("--threads_num", type=int, default=3, help="Number of threads for evaluation.")
 
     arg_parser.add_argument(
         "--eval_type",
@@ -804,6 +815,7 @@ if __name__ == "__main__":
         dataset_path=args.dataset_path,
         verbose=True,
         eval_method=args.eval_method,
+        parallel_threads=args.threads_num,
     )
     try:
         results = evaluator.eval(
