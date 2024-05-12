@@ -267,13 +267,13 @@ class SQLGeneratorAgent(BaseSQLGeneratorAgent):
 
         # create sql agent executor
         sql_agent = ZeroShotAgent(llm_chain=llm_chain, allowed_tools=tools_name)
-        if self.llm_config.llm_source in ["azure", "meta", "deepseek"]:
+        if self.llm_config.llm_source in ["perplexity"]:
+            # for perplexity llm, it doesn't support custom stopping words
+            sql_agent_executor = AgentExecutor.from_agent_and_tools(agent=sql_agent, tools=agent_tools)
+        else:
             sql_agent_executor = AgentExecutor.from_agent_and_tools(
                 agent=sql_agent, tools=agent_tools, early_stopping_method=early_stopping_method
             )
-        else:
-            # for perplexity llm, it doesn't support custom stopping words
-            sql_agent_executor = AgentExecutor.from_agent_and_tools(agent=sql_agent, tools=agent_tools)
 
         logger.info("Finished creating SQL agent executor.")
         return sql_agent_executor

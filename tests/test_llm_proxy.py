@@ -8,6 +8,7 @@ from text_to_sql.llm.llm_config import (
     DeepSeekLLMConfig,
     LLama3LLMConfig,
     PerplexityLLMConfig,
+    ZhiPuLLMConfig,
 )
 from text_to_sql.llm.llm_proxy import LLMProxy
 
@@ -45,6 +46,13 @@ class TestLLMProxy(unittest.TestCase):
 
     def test_deepseek_llm_proxy(self):
         config = DeepSeekLLMConfig()
+        llm_proxy = LLMProxy.create_llm_proxy(config=config)
+        response = llm_proxy.get_response_from_llm(self.default_question, verbose=True)
+        print(response)
+        assert response is not None
+
+    def test_zhipu_llm_proxy(self):
+        config = ZhiPuLLMConfig()
         llm_proxy = LLMProxy.create_llm_proxy(config=config)
         response = llm_proxy.get_response_from_llm(self.default_question, verbose=True)
         print(response)

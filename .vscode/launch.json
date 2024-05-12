@@ -421,6 +421,87 @@
       }
     },
     {
+      "name": "Prod: Eval Simple using ZhiPu",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/text_to_sql/eval/evaluator.py",
+      "console": "integratedTerminal",
+      "args": [
+        "--model_type",
+        "zhipu",
+        "--model",
+        "glm-4",
+        "--eval_method",
+        "simple",
+        "--num_questions",
+        "200",
+        "--eval_type",
+        "prod",
+        "--pre_eval_result_file",
+        "deepseek/prod_simple_glm-4.json",
+        "--threads_num",
+        "5"
+      ],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      }
+    },
+    {
+      "name": "Prod: Eval Agent using ZhiPu",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/text_to_sql/eval/evaluator.py",
+      "console": "integratedTerminal",
+      "args": [
+        "--model_type",
+        "zhipu",
+        "--model",
+        "glm-4",
+        "--eval_method",
+        "agent",
+        "--num_questions",
+        "200",
+        "--eval_type",
+        "prod",
+        "--pre_eval_result_file",
+        "deepseek/prod_agent_glm-4.json",
+        "--threads_num",
+        "5"
+      ],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      }
+    },
+    {
+      "name": "Prod: Eval Langchain using ZhiPu",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/text_to_sql/eval/evaluator.py",
+      "console": "integratedTerminal",
+      "args": [
+        "--model_type",
+        "zhipu",
+        "--model",
+        "glm-4",
+        "--eval_method",
+        "langchain",
+        "--num_questions",
+        "200",
+        "--eval_type",
+        "prod",
+        "--pre_eval_result_file",
+        "deepseek/prod_langchain_glm-4.json",
+        "--threads_num",
+        "5"
+      ],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      }
+    },
+    {
       "name": "template",
       "type": "debugpy",
       "request": "launch",
