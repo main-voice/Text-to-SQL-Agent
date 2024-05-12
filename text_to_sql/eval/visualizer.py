@@ -112,18 +112,26 @@ class EvalResultVisualizer:
             "token_usage": self.visualize_token_usage,
             "eval_duration": self.visualize_eval_duration,
         }
+        self.colors = [
+            "#8ECFC9",
+            "#FFBE7A",
+            "#FA7F6F",
+            "#82B0D2",
+            "#BEB8DC",
+            "#E7DAD2",
+        ]
+        self.transparency = 0.5
+        self.dpi = 350
+        self.figsize = (10, 6)
 
     def visualize_accuracy(self, analyzer_items: List[AnalyzerItem], output_dir: str):
         """
         Visualize the accuracy of the evaluation results.
         """
-        if not isinstance(output_dir, Path):
-            output_dir = Path(output_dir)
-        if not output_dir.is_absolute():
-            output_dir = Path(__file__).parent / output_dir
+        output_dir = self.preprocess_output_dir(output_dir)
 
-        plt.figure(figsize=(10, 6))
-        bar_width = 0.2
+        plt.figure(figsize=self.figsize, dpi=self.dpi)
+        bar_width = 0.15
         methods = sorted(set(item.method for item in analyzer_items))
         models = sorted(set(item.llm_model for item in analyzer_items))
 
@@ -139,10 +147,10 @@ class EvalResultVisualizer:
                 accuracy = item.accuracy if item and item.accuracy else 0
                 y.append(accuracy)
 
-            plt.bar(x + i * bar_width, y, width=bar_width, label=model)
+            plt.bar(x + i * bar_width, y, width=bar_width, label=model, color=self.colors[i % len(self.colors)])
 
         plt.xticks(x + bar_width, methods)
-        plt.xlabel("Methods")
+        plt.xlabel("Eval Methods")
         plt.ylabel("Accuracy")
         plt.title("Comparison of Accuracy")
 
@@ -157,12 +165,9 @@ class EvalResultVisualizer:
         """
         Visualize the token usage of the evaluation results.
         """
-        if not isinstance(output_dir, Path):
-            output_dir = Path(output_dir)
-        if not output_dir.is_absolute():
-            output_dir = Path(__file__).parent / output_dir
+        output_dir = self.preprocess_output_dir(output_dir)
 
-        plt.figure(figsize=(10, 6))
+        plt.figure(figsize=self.figsize, dpi=self.dpi)
         methods = sorted(set(item.method for item in analyzer_items))
         models = sorted(set(item.llm_model for item in analyzer_items))
 
@@ -187,16 +192,33 @@ class EvalResultVisualizer:
                     data.append(values)
                     labels.append(f"{model} & {method}")
 
-        plt.boxplot(
+        # set colors for different models (same models have the same color)
+        model_colors = {model: self.colors[i % len(self.colors)] for i, model in enumerate(models)}
+
+        box_plots = plt.boxplot(
             data,
             labels=labels,
+            patch_artist=True,
             notch=False,
             showmeans=True,
             meanline=True,
-            flierprops=dict(marker="o", markersize=5),
-            medianprops=dict(linewidth=1.5, color="red"),
-            meanprops=dict(linewidth=1.5, color="blue"),
+            flierprops={"marker": "o", "markersize": 5},
+            medianprops={"linewidth": 1.5},
+            meanprops={"linewidth": 1.5},
         )
+
+        for plot, color in zip(box_plots["boxes"], [model_colors[model] for model in models for _ in methods]):
+            plot.set_facecolor(color)
+            plot.set_alpha(self.transparency)
+
+            plot.set_edgecolor(color)
+
+        # set colors for medians and means same as the box color
+        for median, color in zip(box_plots["medians"], [model_colors[model] for model in models for _ in methods]):
+            median.set_color(color)
+
+        for mean, color in zip(box_plots["means"], [model_colors[model] for model in models for _ in methods]):
+            mean.set_color(color)
 
         plt.xlabel("Model & Eval Method")
         plt.ylabel("Token Usage")
@@ -214,12 +236,9 @@ class EvalResultVisualizer:
         """
         Visualize the evaluation duration of the evaluation results.
         """
-        if not isinstance(output_dir, Path):
-            output_dir = Path(output_dir)
-        if not output_dir.is_absolute():
-            output_dir = Path(__file__).parent / output_dir
+        output_dir = self.preprocess_output_dir(output_dir)
 
-        plt.figure(figsize=(10, 6))
+        plt.figure(figsize=self.figsize, dpi=self.dpi)
         methods = sorted(set(item.method for item in analyzer_items))
         models = sorted(set(item.llm_model for item in analyzer_items))
 
@@ -244,16 +263,32 @@ class EvalResultVisualizer:
                     data.append(values)
                     labels.append(f"{model} & {method}")
 
-        plt.boxplot(
+        # set colors for different models (same models have the same color)
+        model_colors = {model: self.colors[i % len(self.colors)] for i, model in enumerate(models)}
+
+        box_plots = plt.boxplot(
             data,
             labels=labels,
+            patch_artist=True,
             notch=False,
             showmeans=True,
             meanline=True,
-            flierprops=dict(marker="o", markersize=5),
-            medianprops=dict(linewidth=1.5, color="red"),
-            meanprops=dict(linewidth=1.5, color="blue"),
+            flierprops={"marker": "o", "markersize": 5},
+            medianprops={"linewidth": 1.5},
+            meanprops={"linewidth": 1.5},
         )
+        for plot, color in zip(box_plots["boxes"], [model_colors[model] for model in models for _ in methods]):
+            plot.set_facecolor(color)
+            plot.set_alpha(self.transparency)
+
+            plot.set_edgecolor(color)
+
+        # set colors for medians and means same as the box color
+        for median, color in zip(box_plots["medians"], [model_colors[model] for model in models for _ in methods]):
+            median.set_color(color)
+
+        for mean, color in zip(box_plots["means"], [model_colors[model] for model in models for _ in methods]):
+            mean.set_color(color)
 
         plt.xlabel("Model & Eval Method")
 
@@ -275,11 +310,7 @@ class EvalResultVisualizer:
             results (List[AnalyzerItem]): The evaluation results.
             output_dir (Path): The output directory to save the visualizations.
         """
-        output_dir = Path(output_dir)
-        if not output_dir.is_absolute():
-            output_dir = Path(__file__).parent / output_dir
-
-        output_dir.mkdir(parents=True, exist_ok=True)
+        output_dir = self.preprocess_output_dir(output_dir)
 
         supported_metrics = self.metrics_visualzer_func.keys()
         if metrics is None:
@@ -293,6 +324,15 @@ class EvalResultVisualizer:
         for metric in metrics:
             logger.info(f"Visualizing {metric}")
             self.metrics_visualzer_func[metric](analyzer_items, output_dir)
+
+    def preprocess_output_dir(self, output_dir: str | Path):
+        """Preprocess the output directory."""
+        output_dir = Path(output_dir)
+        if not output_dir.is_absolute():
+            output_dir = Path(__file__).parent / output_dir
+
+        output_dir.mkdir(parents=True, exist_ok=True)
+        return output_dir
 
 
 if __name__ == "__main__":
