@@ -185,11 +185,11 @@ class RelevantColumnsInfoTool(BaseSQLAgentTool, BaseTool):
         """
         logger.info(f"The Agent is calling tool: {self.name}. Input table and columns name: {table_with_columns}.")
 
-        # remove possible new line character
+        # remove possible new line character and ", ' characters
         table_with_columns = table_with_columns.split("\n")[0].strip()
         table_column_items_list = table_with_columns.split(";")
         # remove those empty items
-        table_column_items_list = [item.strip() for item in table_column_items_list if item.strip()]
+        table_column_items_list = [item.strip("'\"").strip() for item in table_column_items_list if item.strip()]
         table_with_columns_dict: Dict[str, List[str]] = {}
 
         for item in table_column_items_list:
@@ -289,7 +289,7 @@ class TablesSchemaTool(BaseSQLAgentTool, BaseTool):
         table_names = table_names.split("\n")[0].strip()
 
         table_names = table_names.split(",")
-        table_names = [table_name.strip() for table_name in table_names]
+        table_names = [table_name.strip("\"'").strip() for table_name in table_names]
 
         all_available_table_names = self.db_manager.get_available_table_names()
         if not all_available_table_names:
