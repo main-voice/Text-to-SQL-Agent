@@ -43,3 +43,31 @@ class EvalResultItem(BaseModel):
     eval_duration: Optional[float] = Field(default=None)
 
     error_detail: str = Field(default=None, description="Error detail message if any")
+
+
+class BoxPlotItem(BaseModel):
+    """Item for box plot"""
+
+    min_value: float
+    max_value: float
+    avg_value: float
+    median: float  # 50th percentile, q2
+    q1: float
+    q3: float
+    outliers: Optional[list] = Field(default=[])
+
+
+class AnalyzerItem(BaseModel):
+    """Item for analyzer and visualizer"""
+
+    platform: str = Field(description="The LLM platform")
+    llm_model: str = Field(description="The LLM model")
+    method: str = Field(description="The method used for the evaluation")
+    accuracy: float = Field(description="The accuracy rate of the evaluation result")
+    token_usage: Optional[BoxPlotItem] = Field(
+        description="The average token usage of the evaluation result", default=None
+    )
+
+    eval_duration: Optional[BoxPlotItem] = Field(
+        description="The average evaluation duration of the evaluation result", default=None
+    )
