@@ -57,13 +57,29 @@ class BoxPlotItem(BaseModel):
     outliers: Optional[list] = Field(default=[])
 
 
+class AccuracyItem(BaseModel):
+    """Item for accuracy"""
+
+    accuracy_all: float = Field(description="The accuracy rate of all evaluation item")
+    easy_item_count: int = Field(description="The count of easy evaluation item")
+    easy_accuracy: float = Field(description="The accuracy rate of easy evaluation item")
+    medium_item_count: int = Field(description="The count of medium evaluation item")
+    medium_accuracy: float = Field(description="The accuracy rate of medium evaluation item")
+    hard_item_count: int = Field(description="The count of hard evaluation item")
+    hard_accuracy: float = Field(description="The accuracy rate of hard evaluation item")
+    ultra_item_count: int = Field(description="The count of ultra evaluation item")
+    ultra_accuracy: float = Field(description="The accuracy rate of ultra evaluation item")
+
+
 class AnalyzerItem(BaseModel):
     """Item for analyzer and visualizer"""
 
     platform: str = Field(description="The LLM platform")
     llm_model: str = Field(description="The LLM model")
     method: str = Field(description="The method used for the evaluation")
-    accuracy: float = Field(description="The accuracy rate of the evaluation result")
+    accuracy: AccuracyItem = Field(
+        description="The accuracy rate of the evaluation result, including overall and by hardness level"
+    )
     token_usage: Optional[BoxPlotItem] = Field(
         description="The average token usage of the evaluation result", default=None
     )

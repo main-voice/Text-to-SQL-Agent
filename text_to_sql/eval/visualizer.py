@@ -7,7 +7,7 @@ from typing import List
 import matplotlib.pyplot as plt
 import numpy as np
 
-from text_to_sql.eval.models import AnalyzerItem, BoxPlotItem, EvalResultItem
+from text_to_sql.eval.models import AccuracyItem, AnalyzerItem, BoxPlotItem, EvalResultItem, SQLHardness
 from text_to_sql.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -18,6 +18,61 @@ class EvalResultAnalyzer:
 
     def __init__(self, eval_dir: str):
         self.eval_dir = Path(__file__).parent / eval_dir
+
+    def analyze_accuracy(self, eval_results: List[EvalResultItem]) -> AccuracyItem:
+        """Analyze the accuracy of the evaluation results, including overall and by different hardness level."""
+        accuracy_all = sum(1 for r in eval_results if r.is_correct) / len(eval_results)
+        easy_item_count = len([r for r in eval_results if r.hardness == SQLHardness.EASY])
+        easy_accuracy = 0
+        if easy_item_count > 0:
+            logger.debug(f"EASY Hardness item number count: {easy_item_count}.")
+            easy_accuracy = (
+                sum(1 for r in eval_results if r.hardness == SQLHardness.EASY and r.is_correct) / easy_item_count
+            )
+        else:
+            logger.debug("No easy item found.")
+
+        medium_item_count = len([r for r in eval_results if r.hardness == SQLHardness.MEDIUM])
+        medium_accuracy = 0
+        if medium_item_count > 0:
+            logger.debug(f"MEDIUM Hardness item number count: {medium_item_count}.")
+            medium_accuracy = (
+                sum(1 for r in eval_results if r.hardness == SQLHardness.MEDIUM and r.is_correct) / medium_item_count
+            )
+        else:
+            logger.debug("No medium item found.")
+
+        hard_item_count = len([r for r in eval_results if r.hardness == SQLHardness.HARD])
+        hard_accuracy = 0
+        if hard_item_count > 0:
+            logger.debug(f"HARD Hardness item number count: {hard_item_count}.")
+            hard_accuracy = (
+                sum(1 for r in eval_results if r.hardness == SQLHardness.HARD and r.is_correct) / hard_item_count
+            )
+        else:
+            logger.debug("No hard item found.")
+
+        ultra_item_count = len([r for r in eval_results if r.hardness == SQLHardness.ULTRA])
+        ultra_accuracy = 0
+        if ultra_item_count > 0:
+            logger.debug(f"ULTRA Hardness item number count: {ultra_item_count}.")
+            ultra_accuracy = (
+                sum(1 for r in eval_results if r.hardness == SQLHardness.ULTRA and r.is_correct) / ultra_item_count
+            )
+        else:
+            logger.debug("No ultra item found.")
+
+        return AccuracyItem(
+            accuracy_all=accuracy_all,
+            easy_item_count=easy_item_count,
+            easy_accuracy=easy_accuracy,
+            medium_item_count=medium_item_count,
+            medium_accuracy=medium_accuracy,
+            hard_item_count=hard_item_count,
+            hard_accuracy=hard_accuracy,
+            ultra_item_count=ultra_item_count,
+            ultra_accuracy=ultra_accuracy,
+        )
 
     def analyze(self) -> List[AnalyzerItem]:
         """Analyze evaluation results and return the results."""
@@ -40,7 +95,7 @@ class EvalResultAnalyzer:
                     logger.error(f"Failed to load {eval_file}: {e}")
                     continue
 
-                accuracy = sum(1 for r in eval_results if r.is_correct) / len(eval_results)
+                accuracy_item = self.analyze_accuracy(eval_results)
 
                 # loading token usage and evaluation duration data
                 token_usage = [r.token_usage for r in eval_results if r.token_usage is not None]
@@ -89,7 +144,7 @@ class EvalResultAnalyzer:
                         platform=platform,
                         llm_model=model_name,
                         method=method,
-                        accuracy=accuracy,
+                        accuracy=accuracy_item,
                         token_usage=token_usage_item,
                         eval_duration=eval_duration_item,
                     )
@@ -144,7 +199,7 @@ class EvalResultVisualizer:
                 item = next(
                     (item for item in analyzer_items if item.method == method and item.llm_model == model), None
                 )
-                accuracy = item.accuracy if item and item.accuracy else 0
+                accuracy = item.accuracy.accuracy_all if item and item.accuracy.accuracy_all else 0
                 y.append(accuracy)
 
             plt.bar(x + i * bar_width, y, width=bar_width, label=model, color=self.colors[i % len(self.colors)])
@@ -158,6 +213,58 @@ class EvalResultVisualizer:
         plt.tight_layout()
 
         output_file = output_dir.joinpath("accuracy.png")
+        plt.savefig(output_file)
+        plt.close()
+
+    def visualize_accuracy_by_hardness(self, analyzer_items: List[AnalyzerItem], output_dir: str | Path):
+        """
+        Visualize accuracy by difficulty level for each model and method.
+        """
+        output_dir = self.preprocess_output_dir(output_dir)
+
+        hardness_levels = ["easy", "medium", "hard", "ultra"]
+        plt.figure(figsize=self.figsize, dpi=self.dpi)
+        bar_width = 0.8 / len(hardness_levels)  # Adjust bar width based on the number of hardness levels
+
+        # Prepare x-axis labels and positions for bars
+        models_methods = sorted(set((item.llm_model, item.method) for item in analyzer_items))
+        x = np.arange(len(models_methods))
+
+        # Collect data for each hardness level
+        for index, hardness in enumerate(hardness_levels):
+            accuracies = []
+            for model, method in models_methods:
+                item = next(
+                    (item for item in analyzer_items if item.llm_model == model and item.method == method), None
+                )
+                if item:
+                    accuracy = getattr(item.accuracy, f"{hardness}_accuracy", 0)
+                else:
+                    accuracy = 0
+                accuracies.append(accuracy)
+
+            # Plot bars for the current hardness level
+            plt.bar(
+                x + index * bar_width,
+                accuracies,
+                width=bar_width,
+                label=hardness.capitalize(),
+                color=self.colors[index],
+            )
+
+        # Customize chart and save
+        plt.xticks(
+            x + bar_width * len(hardness_levels) / 2,
+            [f"{model} & {method}" for model, method in models_methods],
+            rotation=45,
+        )
+        plt.xlabel("Model + Eval Method")
+        plt.ylabel("Accuracy")
+        plt.title("Comparison of Accuracy by Hardness Levels")
+        plt.legend(title="Hardness")
+
+        plt.tight_layout()
+        output_file = output_dir.joinpath("accuracy_by_hardness.png")
         plt.savefig(output_file)
         plt.close()
 
@@ -344,3 +451,4 @@ if __name__ == "__main__":
 
     visualizer = EvalResultVisualizer()
     visualizer.visualize(analyze_results, default_output_dir)
+    visualizer.visualize_accuracy_by_hardness(analyze_results, default_output_dir)
