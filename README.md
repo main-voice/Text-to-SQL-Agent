@@ -59,8 +59,17 @@ Currectly, the evaluation is based on the [defog-data](https://github.com/defog-
   python -m text_to_sql/eval/evaluator.py --model_type '' --model '' --eval_method '' --num_questions '' --eval_type '' --pre_eval_result_file ''
   ```
 
+### Visualize the evaluation result
+
+You can use the `visualize.py` script to visualize the evaluation result, including the accuracy, cost, and time.
+
+If you are using VSCode, you can navigate the `visualize.py` and use the `Run` button to start the visualization. I have already set up some predefined configurations in `.vscode/launch.json`.
+
+The result will be saved in the `visualization_results` folder.
+
+````shell
 ## Test Code
 
 ```shell
 pytest --cov=text_to_sql --cov-report html
-```
+````
