@@ -1,6 +1,7 @@
 """The Evaluator class is used to evaluate the generated SQL queries against the ground truth queries."""
 
 import argparse
+import concurrent.futures
 import itertools
 import json
 import re
@@ -19,7 +20,7 @@ from text_to_sql.config.settings import settings
 from text_to_sql.database.db_config import DBConfig, MySQLConfig, PostgreSQLConfig
 from text_to_sql.database.db_engine import DBEngine, MySQLEngine, PostgreSQLEngine
 from text_to_sql.eval.models import EvalItem, EvalResultItem, SQLHardness
-from text_to_sql.llm.llm_config import AzureLLMConfig, BaseLLMConfig, LLama3LLMConfig
+from text_to_sql.llm.llm_config import AzureLLMConfig, BaseLLMConfig, DeepSeekLLMConfig, LLama3LLMConfig, ZhiPuLLMConfig
 from text_to_sql.sql_generator.sql_generate_agent import (
     BaseSQLGeneratorAgent,
     LangchainSQLGeneratorAgent,
@@ -144,7 +145,7 @@ class Evaluator:
         """
         create the LLM config based on the model type and model name.
         """
-        supported_model_types = ["azure", "llama3"]
+        supported_model_types = ["azure", "llama3", "deepseek", "zhipu"]
         if self.model_type not in supported_model_types:
             raise ValueError(
                 f"Unsupported model type {self.model_type}. Supported model types are {supported_model_types}"
@@ -159,6 +160,12 @@ class Evaluator:
         elif self.model_type == "llama3":
             logger.info("Creating Llama3 LLM Config for Evaluation...")
             self.llm_config = LLama3LLMConfig(model=self.model)
+        elif self.model_type == "deepseek":
+            logger.info("Creating DeepSeek LLM Config for Evaluation...")
+            self.llm_config = DeepSeekLLMConfig(model=self.model)
+        elif self.model_type == "zhipu":
+            logger.info("Creating ZhiPu LLM Config for Evaluation...")
+            self.llm_config = ZhiPuLLMConfig(model=self.model)
         else:
             raise ValueError(f"Unsupported model type {self.model_type}")
 
@@ -178,8 +185,9 @@ class Evaluator:
             self.db_config.db_name = db_name
 
         if self.eval_method == "agent":
+            # create the SQL generator agent, NOTICE: we don't consider time for evaluation
             self.sql_generator = SQLGeneratorAgent(
-                llm_config=self.llm_config, db_config=self.db_config, verbose=self.verbose
+                llm_config=self.llm_config, db_config=self.db_config, verbose=self.verbose, add_current_time=False
             )
         elif self.eval_method == "langchain":
             self.sql_generator = LangchainSQLGeneratorAgent(llm_config=self.llm_config, db_config=self.db_config)
@@ -367,29 +375,38 @@ class Evaluator:
         # first we have a dataframe with the questions and the ground truth queries
         eval_items: List[EvalItem] = self.loader.load_eval_items(max_rows=num_questions, start_index=start_index)
         logger.info(f"Loaded {len(eval_items)} evaluation items starting from index {start_index}.")
-        self.eval_results = []
+        self.eval_results = [None] * len(eval_items)  # initialize the eval results
 
-        for eval_item in tqdm(eval_items, desc="Evaluating...", total=len(eval_items)):
-            if previous_eval_file:
-                # Check if the current eval_item exists in previous results
-                previous_result = next(
-                    (
-                        item
-                        for item in pre_eval_results
-                        if item.question == eval_item.question and item.db_name == eval_item.db_name
-                    ),
-                    None,
-                )
-                if previous_result and previous_result.is_correct:
-                    # If the previous result is correct, skip evaluation
-                    logger.info(f"Skip evaluation: Question: {eval_item.question} is already correct.")
-                    self.eval_results.append(previous_result)
-                    continue
+        with concurrent.futures.ThreadPoolExecutor(max_workers=self.parallel_threads) as executor:
+            future_to_index = {}
 
-            logger.info(f"Start evaluating question: {eval_item.question}, the database is {eval_item.db_name}...")
+            for index, eval_item in enumerate(eval_items):
+                if previous_eval_file:
+                    # Check if the current eval_item exists in previous results
+                    previous_result = next(
+                        (
+                            item
+                            for item in pre_eval_results
+                            if item.question == eval_item.question and item.db_name == eval_item.db_name
+                        ),
+                        None,
+                    )
+                    if previous_result and previous_result.is_correct:
+                        # If the previous result is correct, skip evaluation
+                        logger.info(f"Skip evaluation: Question: {eval_item.question} is already correct.")
+                        self.eval_results[index] = previous_result
+                        continue
 
-            item_eval_result = self.eval_single_item(eval_item)
-            self.eval_results.append(item_eval_result)
+                logger.info(f"Start evaluating question: {eval_item.question}, the database is {eval_item.db_name}...")
+                future = executor.submit(self.eval_single_item, eval_item)
+                future_to_index[future] = index
+
+            for future in tqdm(
+                concurrent.futures.as_completed(future_to_index), total=len(future_to_index), desc="Evaluating..."
+            ):
+                index = future_to_index[future]
+                result_item = future.result()
+                self.eval_results[index] = result_item
 
         return self.eval_results
 
@@ -405,10 +422,14 @@ class Evaluator:
         self.create_sql_generator(db_name=eval_item.db_name)
 
         # record the time for evaluation
+        instructions = None
+        if eval_item.instructions and eval_item.instructions != "nan":
+            instructions = eval_item.instructions
+
         start_time = time.time()
         sql_generator_response: SQLGeneratorResponse = self.sql_generator.generate_sql(
             user_query=eval_item.question,
-            instructions=eval_item.instructions,
+            instructions=instructions,
             single_line_format=True,
             verbose=self.verbose,
         )
@@ -429,6 +450,10 @@ class Evaluator:
         )
 
         if not sql_generator_response.generated_sql or sql_generator_response.error:
+            if sql_generator_response.error:
+                result_item.error_detail = sql_generator_response.error
+            else:
+                result_item.error_detail = "Failed to generate the query."
             logger.error(
                 f"Failed to generate query for question: {eval_item.question},\
                 the error is {sql_generator_response.error}."
@@ -497,10 +522,13 @@ class Evaluator:
                     logger.info(f"The generated query is correct. One of acceptable result: \n{acceptable_result}\n")
                     return True
 
+            warning_message = "Can not match any golden query results"
+            logger.warning(warning_message)
+            result_item.error_detail = warning_message
             return False
 
-        except ValueError as e:
-            logger.error(f"Error when executing the query: {e}")
+        except Exception as e:
+            result_item.error_detail = str(e)
             return False
 
     def compare_df(
@@ -710,19 +738,19 @@ class Evaluator:
             if isinstance(orig, psycopg2.Error):
                 logger.error(f"It's origin is psycopg2 Error in executing the query: {orig}")
             capture_exception(e)
-            return pd.DataFrame()
+            raise e
         except SQLAlchemyError as e:
             logger.error(f"SQLAlchemyError when executing the query: error is {e}, query is {query}")
             capture_exception(e)
-            return pd.DataFrame()
+            raise e
         except psycopg2.Error as e:
             logger.error(f"psycopg2.Error in executing the query: error is {e}, query is {query}")
             capture_exception(e)
-            return pd.DataFrame()
+            raise e
         except Exception as e:  # pylint: disable=broad-except
             logger.error(f"Unknown error in executing the query: error is {e}, query is {query}")
             capture_exception(e)
-            return pd.DataFrame()
+            raise e
 
 
 if __name__ == "__main__":
@@ -735,7 +763,9 @@ if __name__ == "__main__":
     arg_parser.add_argument("--db_type", type=str, default="postgres", help="Type of the database.")
 
     # llm related arguments
-    arg_parser.add_argument("--model_type", type=str, help="Type of the LLM model.", choices=["azure", "llama3"])
+    arg_parser.add_argument(
+        "--model_type", type=str, help="Type of the LLM model.", choices=["azure", "llama3", "deepseek", "zhipu"]
+    )
     arg_parser.add_argument("--model", type=str, help="Model name of the LLM.")
 
     # evaluation related arguments
@@ -750,6 +780,7 @@ if __name__ == "__main__":
         default="",
         help="[Optional] Path to an existing evaluation result file, will update the existing file.",
     )
+    arg_parser.add_argument("--threads_num", type=int, default=3, help="Number of threads for evaluation.")
 
     arg_parser.add_argument(
         "--eval_type",
@@ -787,13 +818,14 @@ if __name__ == "__main__":
         dataset_path=args.dataset_path,
         verbose=True,
         eval_method=args.eval_method,
+        parallel_threads=args.threads_num,
     )
     try:
         results = evaluator.eval(
             num_questions=args.num_questions, start_index=args.start_index, previous_eval_file=args.pre_eval_result_file
         )
         evaluator.save_output(args.eval_type, results)
-    except Exception as e:  # pylint: disable=broad-except
-        logger.error(f"Error in evaluating the generated SQL queries: {e}")
-        capture_exception(e)
-        evaluator.save_output(args.eval_type)
+    except Exception as error:  # pylint: disable=broad-except
+        logger.error(f"Error in evaluating the generated SQL queries: {error}")
+        capture_exception(error)
+        evaluator.save_output(args.eval_type, results)

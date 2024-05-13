@@ -1,7 +1,13 @@
 import os
 import unittest
 
-from text_to_sql.llm.llm_config import AzureLLMConfig, LLama3LLMConfig, PerplexityLLMConfig
+from text_to_sql.llm.llm_config import (
+    AzureLLMConfig,
+    DeepSeekLLMConfig,
+    LLama3LLMConfig,
+    PerplexityLLMConfig,
+    ZhiPuLLMConfig,
+)
 
 
 class TestLLMConfig(unittest.TestCase):
@@ -35,3 +41,13 @@ class TestLLMConfig(unittest.TestCase):
         assert llama3_llm_config.endpoint is not None
         assert llama3_llm_config.api_key.get_secret_value() is not None
         print(llama3_llm_config.dict())
+
+        deepseek_llm_config = DeepSeekLLMConfig(_env_file=self.test_env_abs_path)
+        assert deepseek_llm_config.endpoint is not None
+        assert deepseek_llm_config.api_key.get_secret_value() is not None
+        print(deepseek_llm_config.dict())
+
+        zhipu_llm_config = ZhiPuLLMConfig(_env_file=self.test_env_abs_path)
+        assert zhipu_llm_config.endpoint is not None
+        assert zhipu_llm_config.api_key.get_secret_value() is not None
+        print(zhipu_llm_config.dict())

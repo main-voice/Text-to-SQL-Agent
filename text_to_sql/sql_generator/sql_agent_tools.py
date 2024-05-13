@@ -185,11 +185,11 @@ class RelevantColumnsInfoTool(BaseSQLAgentTool, BaseTool):
         """
         logger.info(f"The Agent is calling tool: {self.name}. Input table and columns name: {table_with_columns}.")
 
-        # remove possible new line character
+        # remove possible new line character and ", ' characters
         table_with_columns = table_with_columns.split("\n")[0].strip()
         table_column_items_list = table_with_columns.split(";")
         # remove those empty items
-        table_column_items_list = [item.strip() for item in table_column_items_list if item.strip()]
+        table_column_items_list = [item.strip("'\"").strip() for item in table_column_items_list if item.strip()]
         table_with_columns_dict: Dict[str, List[str]] = {}
 
         for item in table_column_items_list:
@@ -289,7 +289,7 @@ class TablesSchemaTool(BaseSQLAgentTool, BaseTool):
         table_names = table_names.split("\n")[0].strip()
 
         table_names = table_names.split(",")
-        table_names = [table_name.strip() for table_name in table_names]
+        table_names = [table_name.strip("\"'").strip() for table_name in table_names]
 
         all_available_table_names = self.db_manager.get_available_table_names()
         if not all_available_table_names:
@@ -424,8 +424,7 @@ class SQLAgentToolkits(BaseToolkit):
         arbitrary_types_allowed = True
         extra = "allow"
 
-    def get_tools(self) -> List[BaseTool]:
-        # TODO: Add tools choice for the agent
+    def get_tools(self, with_time: bool = True) -> List[BaseTool]:
         _tools = []
 
         # Find relevant tables tool
@@ -443,17 +442,9 @@ class SQLAgentToolkits(BaseToolkit):
         _tools.append(tables_info_tool)
 
         # Get current time tool
-        current_time_tool = CurrentTimeTool(db_manager=self.db_manager)
-        _tools.append(current_time_tool)
-
-        # Add translation tool
-        # translator: BaseTranslator = None
-        # if translate_source == "llm":
-        #     translator = LLMTranslator()
-        # elif translate_source == "youdao":
-        #     translator = YoudaoTranslator()
-        #
-        # _tools.append(TranslateTool(db_manager=self.db_manager, translator=translator))
+        if with_time:
+            current_time_tool = CurrentTimeTool(db_manager=self.db_manager)
+            _tools.append(current_time_tool)
 
         # Validate SQL correctness tool
         validate_sql_tool = ValidateSQLCorrectness(db_manager=self.db_manager)
