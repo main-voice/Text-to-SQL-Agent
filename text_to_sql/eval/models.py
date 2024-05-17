@@ -54,7 +54,7 @@ class BoxPlotItem(BaseModel):
     median: float  # 50th percentile, q2
     q1: float
     q3: float
-    outliers: Optional[list] = Field(default=[])
+    outliers: Optional[list] = Field(default=[], exclude=True)
 
 
 class AccuracyItem(BaseModel):

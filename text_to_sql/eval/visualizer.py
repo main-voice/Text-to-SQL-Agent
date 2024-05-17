@@ -21,13 +21,13 @@ class EvalResultAnalyzer:
 
     def analyze_accuracy(self, eval_results: List[EvalResultItem]) -> AccuracyItem:
         """Analyze the accuracy of the evaluation results, including overall and by different hardness level."""
-        accuracy_all = sum(1 for r in eval_results if r.is_correct) / len(eval_results)
+        accuracy_all = round(sum(1 for r in eval_results if r.is_correct) / len(eval_results), 3)
         easy_item_count = len([r for r in eval_results if r.hardness == SQLHardness.EASY])
         easy_accuracy = 0
         if easy_item_count > 0:
             logger.debug(f"EASY Hardness item number count: {easy_item_count}.")
-            easy_accuracy = (
-                sum(1 for r in eval_results if r.hardness == SQLHardness.EASY and r.is_correct) / easy_item_count
+            easy_accuracy = round(
+                (sum(1 for r in eval_results if r.hardness == SQLHardness.EASY and r.is_correct) / easy_item_count), 3
             )
         else:
             logger.debug("No easy item found.")
@@ -36,8 +36,9 @@ class EvalResultAnalyzer:
         medium_accuracy = 0
         if medium_item_count > 0:
             logger.debug(f"MEDIUM Hardness item number count: {medium_item_count}.")
-            medium_accuracy = (
-                sum(1 for r in eval_results if r.hardness == SQLHardness.MEDIUM and r.is_correct) / medium_item_count
+            medium_accuracy = round(
+                sum(1 for r in eval_results if r.hardness == SQLHardness.MEDIUM and r.is_correct) / medium_item_count,
+                3,
             )
         else:
             logger.debug("No medium item found.")
@@ -46,8 +47,8 @@ class EvalResultAnalyzer:
         hard_accuracy = 0
         if hard_item_count > 0:
             logger.debug(f"HARD Hardness item number count: {hard_item_count}.")
-            hard_accuracy = (
-                sum(1 for r in eval_results if r.hardness == SQLHardness.HARD and r.is_correct) / hard_item_count
+            hard_accuracy = round(
+                (sum(1 for r in eval_results if r.hardness == SQLHardness.HARD and r.is_correct) / hard_item_count), 3
             )
         else:
             logger.debug("No hard item found.")
@@ -56,8 +57,8 @@ class EvalResultAnalyzer:
         ultra_accuracy = 0
         if ultra_item_count > 0:
             logger.debug(f"ULTRA Hardness item number count: {ultra_item_count}.")
-            ultra_accuracy = (
-                sum(1 for r in eval_results if r.hardness == SQLHardness.ULTRA and r.is_correct) / ultra_item_count
+            ultra_accuracy = round(
+                sum(1 for r in eval_results if r.hardness == SQLHardness.ULTRA and r.is_correct) / ultra_item_count, 3
             )
         else:
             logger.debug("No ultra item found.")
@@ -98,24 +99,26 @@ class EvalResultAnalyzer:
                 accuracy_item = self.analyze_accuracy(eval_results)
 
                 # loading token usage and evaluation duration data
-                token_usage = [r.token_usage for r in eval_results if r.token_usage is not None]
-                eval_duration = [r.eval_duration for r in eval_results if r.eval_duration is not None]
+                token_usage = [r.token_usage for r in eval_results if r.token_usage is not None and r.token_usage > 0]
+                eval_duration = [
+                    r.eval_duration for r in eval_results if r.eval_duration is not None and r.eval_duration > 0
+                ]
 
                 try:
                     token_usage_item = None
                     if token_usage:
-                        token_usage_q1 = np.percentile(token_usage, 25)
-                        token_usage_q3 = np.percentile(token_usage, 75)
-                        iqr = token_usage_q3 - token_usage_q1
-                        lower_bound = token_usage_q1 - 1.5 * iqr
-                        upper_bound = token_usage_q3 + 1.5 * iqr
-                        outliers = [t for t in token_usage if t < lower_bound or t > upper_bound]
+                        token_usage_q1 = round(np.percentile(token_usage, 25), 3)
+                        token_usage_q3 = round(np.percentile(token_usage, 75), 3)
+                        iqr = round(token_usage_q3 - token_usage_q1)
+                        lower_bound = round(token_usage_q1 - 1.5 * iqr, 3)
+                        upper_bound = round(token_usage_q3 + 1.5 * iqr, 3)
+                        outliers = [round(t, 3) for t in token_usage if t < lower_bound or t > upper_bound]
 
                         token_usage_item = BoxPlotItem(
-                            min_value=np.min(token_usage),
-                            max_value=np.max(token_usage),
-                            avg_value=np.mean(token_usage),
-                            median=np.median(token_usage),
+                            min_value=round(np.min(token_usage), 3),
+                            max_value=round(np.max(token_usage), 3),
+                            avg_value=round(np.mean(token_usage), 3),
+                            median=round(np.median(token_usage), 3),
                             q1=token_usage_q1,
                             q3=token_usage_q3,
                             outliers=outliers,
@@ -123,18 +126,18 @@ class EvalResultAnalyzer:
 
                     eval_duration_item = None
                     if eval_duration:
-                        eval_duration_q1 = np.percentile(eval_duration, 25)
-                        eval_duration_q3 = np.percentile(eval_duration, 75)
-                        iqr = eval_duration_q3 - eval_duration_q1
-                        lower_bound = eval_duration_q1 - 1.5 * iqr
-                        upper_bound = eval_duration_q3 + 1.5 * iqr
-                        outliers = [t for t in eval_duration if t < lower_bound or t > upper_bound]
+                        eval_duration_q1 = round(np.percentile(eval_duration, 25), 3)
+                        eval_duration_q3 = round(np.percentile(eval_duration, 75), 3)
+                        iqr = round(eval_duration_q3 - eval_duration_q1, 3)
+                        lower_bound = round(eval_duration_q1 - 1.5 * iqr, 3)
+                        upper_bound = round(eval_duration_q3 + 1.5 * iqr, 3)
+                        outliers = [round(t, 3) for t in eval_duration if t < lower_bound or t > upper_bound]
 
                         eval_duration_item = BoxPlotItem(
-                            min_value=np.min(eval_duration),
-                            max_value=np.max(eval_duration),
-                            avg_value=np.mean(eval_duration),
-                            median=np.median(eval_duration),
+                            min_value=round(np.min(eval_duration), 3),
+                            max_value=round(np.max(eval_duration), 3),
+                            avg_value=round(np.mean(eval_duration), 3),
+                            median=round(np.median(eval_duration), 3),
                             q1=eval_duration_q1,
                             q3=eval_duration_q3,
                             outliers=outliers,
@@ -448,6 +451,8 @@ if __name__ == "__main__":
 
     analyzer = EvalResultAnalyzer(default_eval_dir)
     analyze_results = analyzer.analyze()
+    analyze_results_dict = [item.dict() for item in analyze_results]
+    print(analyze_results_dict)
 
     visualizer = EvalResultVisualizer()
     visualizer.visualize(analyze_results, default_output_dir)
