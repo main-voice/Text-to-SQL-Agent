@@ -2,7 +2,7 @@ import unittest
 
 from text_to_sql.config.settings import settings
 from text_to_sql.database.db_config import MySQLConfig, PostgreSQLConfig
-from text_to_sql.llm.llm_config import LLama3LLMConfig, PerplexityLLMConfig
+from text_to_sql.llm.llm_config import LLama3LLMConfig, PerplexityLLMConfig, ZhiPuLLMConfig
 from text_to_sql.sql_generator.sql_generate_agent import (
     BaseSQLGeneratorAgent,
     LangchainSQLGeneratorAgent,
@@ -65,6 +65,15 @@ class TestSQLGeneratorAgent(unittest.TestCase):
 
         print(f"LLama3 generated SQL: {sql}")
         self.validate_sql(agent=llama_sql_agent, sql=sql.generated_sql, expected_result="baokker")
+
+    def test_simple_agent_zhipu(self):
+        """Test the SimpleSQLGeneratorAgent with Zhipu LLM"""
+        question = "Find the user who has the most posts"
+        zhipu_sql_agent = SimpleSQLGeneratorAgent(llm_config=ZhiPuLLMConfig())
+        sql = zhipu_sql_agent.generate_sql(user_query=question, single_line_format=True)
+
+        print(f"Zhipu generated SQL: {sql}")
+        self.validate_sql(agent=zhipu_sql_agent, sql=sql.generated_sql, expected_result="baokker")
 
     def test_sql_agent_llama3(self):
         """

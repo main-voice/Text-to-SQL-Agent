@@ -3,7 +3,7 @@ from pathlib import Path
 
 from text_to_sql.database.db_config import PostgreSQLConfig
 from text_to_sql.eval.evaluator import Evaluator, Loader
-from text_to_sql.eval.models import EvalResultItem
+from text_to_sql.eval.models import EvalResultItem, SQLHardness
 
 
 class TestEval(unittest.TestCase):
@@ -34,7 +34,7 @@ class TestEval(unittest.TestCase):
             question="test question",
             db_name="academic",
             query_category="select",
-            query=test_same_sql,
+            golden_query=test_same_sql,
             generated_query=test_same_sql,
         )
         self.assertTrue(self.evaluator.check_exec_correctness(eval_result_item))
@@ -50,7 +50,7 @@ class TestEval(unittest.TestCase):
             question="test question",
             db_name="academic",
             query_category="select",
-            query=expected_sql,
+            golden_query=expected_sql,
             generated_query=generated_sql,
         )
 
@@ -74,7 +74,7 @@ class TestEval(unittest.TestCase):
             total number of keywords within each domain ID? Show all domain IDs.",
             db_name="academic",
             query_category="select",
-            query=refer_sql,
+            golden_query=refer_sql,
             generated_query=error_sql_divide_zero,
         )
         self.assertFalse(self.evaluator.check_exec_correctness(eval_result_item))
@@ -106,3 +106,13 @@ class TestEval(unittest.TestCase):
             "SELECT persons.name, persons.id FROM persons WHERE persons.age > 25 GROUP BY persons.name, persons.id"
         )
         assert self.evaluator.get_all_acceptable_sub_queries(query4) == [option1, option2, option3]
+
+    def test_hardness(self):
+        """Test the hardness of the SQL"""
+        easy_sql = "SELECT * FROM publication WHERE year >= 2010;"
+        ultra_sql = "SELECT conference.name, count(publication.pid) AS publication_count FROM publication JOIN \
+        conference ON publication.cid = conference.cid WHERE publication.year >= extract(YEAR FROM CURRENT_DATE) \
+        - 15 GROUP BY conference.name ORDER BY publication_count DESC LIMIT 1;"
+
+        self.assertEqual(self.evaluator.eval_sql_hardness(easy_sql), SQLHardness.EASY)
+        self.assertEqual(self.evaluator.eval_sql_hardness(ultra_sql), SQLHardness.ULTRA)
